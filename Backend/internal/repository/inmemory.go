@@ -1,7 +1,10 @@
 package repository
 
 import (
+	"context"
+	"math/rand"
 	"sync"
+	"time"
 
 	"apiSorteos/internal/models"
 )
@@ -43,78 +46,48 @@ func samplePrizes() []models.Prize {
 	}
 }
 
-func (r *InMemoryRepository) ListPeople() []models.Person {
+func (r *InMemoryRepository) Snapshot(_ context.Context) ([]models.Person, []models.Prize, []models.WinnerRecord, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	people := make([]models.Person, len(r.people))
 	copy(people, r.people)
-	return people
-}
-
-func (r *InMemoryRepository) ListPrizes() []models.Prize {
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	prizes := make([]models.Prize, len(r.prizes))
 	copy(prizes, r.prizes)
-	return prizes
+	winners := make([]models.WinnerRecord, len(r.winners))
+	copy(winners, r.winners)
+	return people, prizes, winners, nil
 }
 
-func (r *InMemoryRepository) PopPerson(index int) (models.Person, bool) {
+func (r *InMemoryRepository) DrawRandom(_ context.Context) (models.WinnerRecord, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if index < 0 || index >= len(r.people) {
-		return models.Person{}, false
+
+	if len(r.people) == 0 {
+		return models.WinnerRecord{}, ErrNoParticipants
 	}
-	p := r.people[index]
-	r.people = append(r.people[:index], r.people[index+1:]...)
-	return p, true
-}
-
-func (r *InMemoryRepository) PopPrize(index int) (models.Prize, bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if index < 0 || index >= len(r.prizes) {
-		return models.Prize{}, false
+	if len(r.prizes) == 0 {
+		return models.WinnerRecord{}, ErrNoPrizes
 	}
-	p := r.prizes[index]
-	r.prizes = append(r.prizes[:index], r.prizes[index+1:]...)
-	return p, true
-}
 
-func (r *InMemoryRepository) SaveWinner(record models.WinnerRecord) models.WinnerRecord {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	record.ID = r.nextWinnerID
+	personIdx := rand.Intn(len(r.people))
+	prizeIdx := rand.Intn(len(r.prizes))
+
+	person := r.people[personIdx]
+	r.people = append(r.people[:personIdx], r.people[personIdx+1:]...)
+
+	prize := r.prizes[prizeIdx]
+	r.prizes = append(r.prizes[:prizeIdx], r.prizes[prizeIdx+1:]...)
+
+	record := models.WinnerRecord{
+		ID:        r.nextWinnerID,
+		Person:    person,
+		Prize:     prize,
+		AwardedAt: time.Now(),
+	}
 	r.nextWinnerID++
 	r.winners = append([]models.WinnerRecord{record}, r.winners...)
 	if len(r.winners) > 5 {
 		r.winners = r.winners[:5]
 	}
-	return record
-}
-
-func (r *InMemoryRepository) RecentWinners() []models.WinnerRecord {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	winners := make([]models.WinnerRecord, len(r.winners))
-	copy(winners, r.winners)
-	return winners
-}
-
-func (r *InMemoryRepository) Remaining() (int, int) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return len(r.people), len(r.prizes)
-}
-
-func (r *InMemoryRepository) Snapshot() ([]models.Person, []models.Prize, []models.WinnerRecord) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	people := make([]models.Person, len(r.people))
-	copy(people, r.people)
-	prizes := make([]models.Prize, len(r.prizes))
-	copy(prizes, r.prizes)
-	winners := make([]models.WinnerRecord, len(r.winners))
-	copy(winners, r.winners)
-	return people, prizes, winners
+	return record, nil
 }

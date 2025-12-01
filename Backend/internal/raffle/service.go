@@ -1,23 +1,15 @@
 package raffle
 
 import (
-	"errors"
-	"math/rand"
+	"context"
 	"sync"
-	"time"
 
 	"apiSorteos/internal/models"
 	"apiSorteos/internal/repository"
 )
 
-var (
-	ErrNoParticipants = errors.New("no hay personas disponibles para el sorteo")
-	ErrNoPrizes       = errors.New("no hay premios disponibles para el sorteo")
-)
-
 type Service struct {
-	repo    *repository.InMemoryRepository
-	rand    *rand.Rand
+	repo    repository.Repository
 	mu      sync.Mutex
 	clients map[*Client]struct{}
 }
@@ -36,10 +28,9 @@ type Event struct {
 	Data interface{} `json:"data"`
 }
 
-func NewService(repo *repository.InMemoryRepository) *Service {
+func NewService(repo repository.Repository) *Service {
 	return &Service{
 		repo:    repo,
-		rand:    rand.New(rand.NewSource(time.Now().UnixNano())),
 		clients: map[*Client]struct{}{},
 	}
 }
@@ -49,7 +40,7 @@ func (s *Service) RegisterClient() *Client {
 	defer s.mu.Unlock()
 	client := &Client{ch: make(chan Event, 4), done: make(chan struct{})}
 	s.clients[client] = struct{}{}
-	client.ch <- Event{Type: "state", Data: s.State()}
+	client.ch <- Event{Type: "state", Data: s.State(context.Background())}
 	return client
 }
 
@@ -74,8 +65,11 @@ func (s *Service) broadcast(evt Event) {
 	}
 }
 
-func (s *Service) State() models.RaffleState {
-	people, prizes, winners := s.repo.Snapshot()
+func (s *Service) State(ctx context.Context) models.RaffleState {
+	people, prizes, winners, err := s.repo.Snapshot(ctx)
+	if err != nil {
+		return models.RaffleState{}
+	}
 	return models.RaffleState{
 		RemainingPeople: len(people),
 		RemainingPrizes: len(prizes),
@@ -85,39 +79,16 @@ func (s *Service) State() models.RaffleState {
 	}
 }
 
-func (s *Service) Draw() (models.WinnerRecord, error) {
+func (s *Service) Draw(ctx context.Context) (models.WinnerRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	people := s.repo.ListPeople()
-	prizes := s.repo.ListPrizes()
-	if len(people) == 0 {
-		return models.WinnerRecord{}, ErrNoParticipants
-	}
-	if len(prizes) == 0 {
-		return models.WinnerRecord{}, ErrNoPrizes
+	record, err := s.repo.DrawRandom(ctx)
+	if err != nil {
+		return models.WinnerRecord{}, err
 	}
 
-	personIdx := s.rand.Intn(len(people))
-	prizeIdx := s.rand.Intn(len(prizes))
-
-	person, ok := s.repo.PopPerson(personIdx)
-	if !ok {
-		return models.WinnerRecord{}, ErrNoParticipants
-	}
-	prize, ok := s.repo.PopPrize(prizeIdx)
-	if !ok {
-		return models.WinnerRecord{}, ErrNoPrizes
-	}
-
-	record := models.WinnerRecord{
-		Person:    person,
-		Prize:     prize,
-		AwardedAt: time.Now(),
-	}
-	record = s.repo.SaveWinner(record)
-
-	state := s.State()
+	state := s.State(ctx)
 	s.broadcast(Event{Type: "winner", Data: record})
 	s.broadcast(Event{Type: "state", Data: state})
 

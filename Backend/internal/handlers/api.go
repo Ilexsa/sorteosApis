@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"apiSorteos/internal/raffle"
+	"apiSorteos/internal/repository"
 
 	"github.com/gin-gonic/gin"
 )
@@ -37,14 +38,14 @@ func (h *APIHandler) Login(c *gin.Context) {
 }
 
 func (h *APIHandler) GetState(c *gin.Context) {
-	c.JSON(http.StatusOK, h.service.State())
+	c.JSON(http.StatusOK, h.service.State(c.Request.Context()))
 }
 
 func (h *APIHandler) RunDraw(c *gin.Context) {
-	record, err := h.service.Draw()
+	record, err := h.service.Draw(c.Request.Context())
 	if err != nil {
 		status := http.StatusInternalServerError
-		if err == raffle.ErrNoParticipants || err == raffle.ErrNoPrizes {
+		if err == repository.ErrNoParticipants || err == repository.ErrNoPrizes {
 			status = http.StatusConflict
 		}
 		c.JSON(status, gin.H{"error": err.Error()})

@@ -1,9 +1,12 @@
 package main
 
 import (
+	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"apiSorteos/internal/handlers"
 	"apiSorteos/internal/raffle"
@@ -18,7 +21,8 @@ func main() {
 		adminPassword = "navidad2024"
 	}
 
-	repo := repository.NewInMemoryRepository()
+	db := mustConnectSQLServer()
+	repo := repository.NewSQLServerRepository(db)
 	service := raffle.NewService(repo)
 	auth := raffle.NewAuthService(adminPassword)
 
@@ -59,4 +63,37 @@ func main() {
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("No se pudo iniciar el servidor: %v", err)
 	}
+}
+
+func mustConnectSQLServer() *sql.DB {
+	connStr := os.Getenv("SQLSERVER_CONN")
+	if connStr == "" {
+		host := getenv("SQLSERVER_HOST", "localhost")
+		port := getenv("SQLSERVER_PORT", "1433")
+		user := getenv("SQLSERVER_USER", "sa")
+		pass := getenv("SQLSERVER_PASSWORD", "YourStrong!Passw0rd")
+		db := getenv("SQLSERVER_DB", "sorteos")
+		connStr = fmt.Sprintf("sqlserver://%s:%s@%s:%s?database=%s&encrypt=disable", user, pass, host, port, db)
+	}
+
+	sqlDB, err := sql.Open("sqlserver", connStr)
+	if err != nil {
+		log.Fatalf("No se pudo crear el pool de conexiones: %v", err)
+	}
+	sqlDB.SetConnMaxIdleTime(5 * time.Minute)
+	sqlDB.SetConnMaxLifetime(30 * time.Minute)
+	sqlDB.SetMaxOpenConns(10)
+	sqlDB.SetMaxIdleConns(5)
+
+	if err := sqlDB.Ping(); err != nil {
+		log.Fatalf("No se pudo conectar a SQL Server: %v", err)
+	}
+	return sqlDB
+}
+
+func getenv(key, fallback string) string {
+	if val := os.Getenv(key); val != "" {
+		return val
+	}
+	return fallback
 }
