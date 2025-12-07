@@ -69,11 +69,12 @@ func mustConnectSQLServer() *sql.DB {
 	connStr := os.Getenv("SQLSERVER_CONN")
 	if connStr == "" {
 		host := getenv("SQLSERVER_HOST", "localhost")
-		port := getenv("SQLSERVER_PORT", "1433")
+		encrypt:=getenv("SQLSERVER_ENCRYPT", "disable")
 		user := getenv("SQLSERVER_USER", "sa")
-		pass := getenv("SQLSERVER_PASSWORD", "YourStrong!Passw0rd")
-		db := getenv("SQLSERVER_DB", "sorteos")
-		connStr = fmt.Sprintf("sqlserver://%s:%s@%s:%s?database=%s&encrypt=disable", user, pass, host, port, db)
+		pass := getenv("SQLSERVER_PASSWORD", "")
+		db := getenv("SQLSERVER_DB", "SORTEOS")
+		connStr = fmt.Sprintf("server=%s;user id=%s;password=%s;database=%s;encrypt=%s",host,
+	user, pass, db, encrypt)
 	}
 
 	sqlDB, err := sql.Open("sqlserver", connStr)
