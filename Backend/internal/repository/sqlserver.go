@@ -64,7 +64,7 @@ func (r *SQLServerRepository) DrawRandom(ctx context.Context) (models.WinnerReco
 }
 
 func (r *SQLServerRepository) availablePeople(ctx context.Context) ([]models.Person, error) {
-	query := `SELECT p.id, p.nombre, '' AS email
+	query := `SELECT p.id, p.nombre, p.email
 FROM personas p
 WHERE NOT EXISTS (SELECT 1 FROM ganadores g WHERE g.persona_id = p.id)
 ORDER BY p.id`
@@ -108,7 +108,7 @@ ORDER BY pr.id`
 }
 
 func (r *SQLServerRepository) recentWinners(ctx context.Context, limit int) ([]models.WinnerRecord, error) {
-	query := `SELECT TOP(@p1) w.id, w.entregado_en, p.id, p.nombre, '' AS email, r.id, r.nombre, r.descripcion
+	query := `SELECT TOP(@p1) w.id, w.entregado_en, p.id, p.nombre, p.email, r.id, r.nombre, r.descripcion
 FROM ganadores w
 INNER JOIN personas p ON p.id = w.persona_id
 INNER JOIN premios r ON r.id = w.premio_id
@@ -131,7 +131,7 @@ ORDER BY w.entregado_en DESC`
 }
 
 func (r *SQLServerRepository) pickRandomPerson(ctx context.Context, tx *sql.Tx) (models.Person, error) {
-	row := tx.QueryRowContext(ctx, `SELECT TOP 1 p.id, p.nombre, '' AS email
+	row := tx.QueryRowContext(ctx, `SELECT TOP 1 p.id, p.nombre, p.email
 FROM personas p
 WHERE NOT EXISTS (SELECT 1 FROM ganadores g WHERE g.persona_id = p.id)
 ORDER BY NEWID()`)
