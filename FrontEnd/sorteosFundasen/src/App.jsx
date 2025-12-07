@@ -75,7 +75,7 @@ function useAudioChime() {
 }
 
 function App() {
-  const [token, setToken] = useState(localStorage.getItem('adminToken') || '')
+  const [token, setToken] = useState('')
   const [password, setPassword] = useState('')
   const [state, setState] = useState(null)
   const [lastWinner, setLastWinner] = useState(null)
@@ -139,7 +139,6 @@ function App() {
       })
       if (!res.ok) throw new Error('Contraseña incorrecta')
       const data = await res.json()
-      localStorage.setItem('adminToken', data.token)
       setToken(data.token)
       setPassword('')
     } catch (err) {
