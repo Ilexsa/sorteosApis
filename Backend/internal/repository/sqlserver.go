@@ -162,17 +162,10 @@ ORDER BY NEWID()`)
 
 func (r *SQLServerRepository) insertWinner(ctx context.Context, tx *sql.Tx, person models.Person, prize models.Prize) (models.WinnerRecord, error) {
 	awardedAt := time.Now().UTC()
-	result, err := tx.ExecContext(ctx, `INSERT INTO ganadores (persona_id, premio_id, entregado_en) VALUES (@p1, @p2, @p3)`, person.ID, prize.ID, awardedAt)
-	if err != nil {
-		return models.WinnerRecord{}, err
-	}
-	winnerID, err := result.LastInsertId()
-	if err != nil {
-		// SQL Server no soporta LastInsertId, así que obtenemos el id con SCOPE_IDENTITY()
-		row := tx.QueryRowContext(ctx, `SELECT CAST(SCOPE_IDENTITY() AS bigint)`)
-		if err := row.Scan(&winnerID); err != nil {
-			return models.WinnerRecord{}, fmt.Errorf("no se pudo obtener el id del ganador: %w", err)
-		}
+	row := tx.QueryRowContext(ctx, `INSERT INTO ganadores (persona_id, premio_id, entregado_en) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3)`, person.ID, prize.ID, awardedAt)
+	var winnerID int64
+	if err := row.Scan(&winnerID); err != nil {
+		return models.WinnerRecord{}, fmt.Errorf("no se pudo obtener el id del ganador: %w", err)
 	}
 
 	return models.WinnerRecord{
