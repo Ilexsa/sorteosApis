@@ -38,7 +38,12 @@ func (h *APIHandler) Login(c *gin.Context) {
 }
 
 func (h *APIHandler) GetState(c *gin.Context) {
-	c.JSON(http.StatusOK, h.service.State(c.Request.Context()))
+	state, err := h.service.State(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, state)
 }
 
 func (h *APIHandler) RunDraw(c *gin.Context) {
