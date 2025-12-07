@@ -12,11 +12,34 @@ body {
   background: url('https://images.unsplash.com/photo-1513623954575-263b061498b5?auto=format&fit=crop&w=1400&q=80') center/cover fixed;
 }
 
+.snow-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.snowflake {
+  position: absolute;
+  top: -20px;
+  color: #fff;
+  animation: snowfall 8s linear infinite;
+}
+
+@keyframes snowfall {
+  to {
+    transform: translateY(110vh) rotate(360deg);
+  }
+}
+
 .page {
   backdrop-filter: blur(4px);
   background: linear-gradient(180deg, rgba(0,0,0,0.55), rgba(0,0,0,0.8));
   min-height: 100vh;
   padding: 40px 24px 120px;
+  position: relative;
+  z-index: 1;
 }
 
 .hero {
@@ -265,6 +288,60 @@ body {
   color: white;
   font-weight: 700;
   box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: grid;
+  place-items: center;
+  z-index: 10;
+}
+
+.modal-card {
+  background: radial-gradient(circle at 20% 20%, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
+  border: 1px solid rgba(255,255,255,0.2);
+  padding: 28px 32px;
+  border-radius: 18px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+  min-width: 320px;
+}
+
+.winner-name {
+  margin: 8px 0 4px;
+  font-size: 24px;
+}
+
+.prize-name {
+  margin: 0;
+  font-size: 18px;
+  color: #ffeaaa;
+  font-weight: 700;
+}
+
+.confetti-wrapper {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 12;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -10px;
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  animation: confetti-fall var(--fall-duration) ease-in forwards;
+}
+
+@keyframes confetti-fall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  50% { opacity: 1; }
+  100% { transform: translateY(110vh) rotate(240deg); opacity: 0; }
 }
 
 @media (max-width: 860px) {

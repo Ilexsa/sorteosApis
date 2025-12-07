@@ -3,6 +3,58 @@ import './App.css'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(/\/$/, '')
 
+const CONFETTI_COLORS = ['#f95738', '#f7b733', '#38bdf8', '#a78bfa', '#34d399']
+
+function launchConfetti() {
+  const wrapper = document.createElement('div')
+  wrapper.className = 'confetti-wrapper'
+  for (let i = 0; i < 120; i += 1) {
+    const piece = document.createElement('span')
+    piece.className = 'confetti-piece'
+    piece.style.left = `${Math.random() * 100}%`
+    piece.style.animationDelay = `${Math.random() * 0.5}s`
+    piece.style.setProperty('--fall-duration', `${2 + Math.random() * 2}s`)
+    piece.style.backgroundColor = CONFETTI_COLORS[i % CONFETTI_COLORS.length]
+    piece.style.transform = `rotate(${Math.random() * 45}deg)`
+    wrapper.appendChild(piece)
+  }
+  document.body.appendChild(wrapper)
+  setTimeout(() => wrapper.remove(), 4000)
+}
+
+const SnowOverlay = () => {
+  const flakes = useMemo(
+    () => Array.from({ length: 80 }, (_, idx) => ({
+      id: idx,
+      left: `${Math.random() * 100}%`,
+      animationDelay: `${Math.random() * 3}s`,
+      animationDuration: `${6 + Math.random() * 4}s`,
+      opacity: 0.4 + Math.random() * 0.4,
+      fontSize: `${12 + Math.random() * 10}px`
+    })),
+    []
+  )
+  return (
+    <div className="snow-overlay" aria-hidden="true">
+      {flakes.map((flake) => (
+        <span
+          key={flake.id}
+          className="snowflake"
+          style={{
+            left: flake.left,
+            animationDelay: flake.animationDelay,
+            animationDuration: flake.animationDuration,
+            opacity: flake.opacity,
+            fontSize: flake.fontSize
+          }}
+        >
+          ❄
+        </span>
+      ))}
+    </div>
+  )
+}
+
 const formatDate = (value) => new Intl.DateTimeFormat('es-ES', {
   hour: '2-digit',
   minute: '2-digit',
@@ -33,7 +85,7 @@ function useAudioChime() {
 }
 
 function App() {
-  const [token, setToken] = useState(localStorage.getItem('adminToken') || '')
+  const [token, setToken] = useState('')
   const [password, setPassword] = useState('')
   const [state, setState] = useState(null)
   const [lastWinner, setLastWinner] = useState(null)
@@ -41,6 +93,7 @@ function App() {
   const [error, setError] = useState('')
   const spinTimeoutRef = useRef(null)
   const [spinning, setSpinning] = useState(false)
+  const [showModal, setShowModal] = useState(false)
   const playChime = useAudioChime()
 
   const headers = useMemo(() => token ? { Authorization: `Bearer ${token}` } : {}, [token])
@@ -96,7 +149,6 @@ function App() {
       })
       if (!res.ok) throw new Error('Contraseña incorrecta')
       const data = await res.json()
-      localStorage.setItem('adminToken', data.token)
       setToken(data.token)
       setPassword('')
     } catch (err) {
@@ -110,6 +162,7 @@ function App() {
     setError('')
     triggerSpin()
     try {
+      await new Promise(resolve => setTimeout(resolve, 3000))
       const res = await fetch(`${API_BASE}/api/draw`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...headers }
@@ -131,8 +184,17 @@ function App() {
   const waitingPeople = state?.waitingPeople || []
   const upcomingPrizes = state?.upcomingPrizes || []
 
+  useEffect(() => {
+    if (!lastWinner) return
+    setShowModal(true)
+    launchConfetti()
+    const timer = setTimeout(() => setShowModal(false), 4000)
+    return () => clearTimeout(timer)
+  }, [lastWinner])
+
   return (
     <div className="page">
+      <SnowOverlay />
       <header className="hero">
         <div>
           <p className="eyebrow">🎄 Festival de Obsequios Fundasen</p>
@@ -202,6 +264,16 @@ function App() {
           <p className="muted">Nuevo ganador</p>
           <p className="strong">{lastWinner.person.name}</p>
           <p>{lastWinner.prize.name}</p>
+        </div>
+      )}
+
+      {showModal && lastWinner && (
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <p className="muted">¡Tenemos ganador!</p>
+            <h3 className="winner-name">{lastWinner.person.name}</h3>
+            <p className="prize-name">{lastWinner.prize.name}</p>
+          </div>
         </div>
       )}
 
