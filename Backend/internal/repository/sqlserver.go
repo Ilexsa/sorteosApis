@@ -64,7 +64,11 @@ func (r *SQLServerRepository) DrawRandom(ctx context.Context) (models.WinnerReco
 }
 
 func (r *SQLServerRepository) availablePeople(ctx context.Context) ([]models.Person, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT id, nombre, email FROM personas WHERE entregado = 0 ORDER BY id`)
+	query := `SELECT p.id, p.nombre, '' AS email
+FROM personas p
+WHERE NOT EXISTS (SELECT 1 FROM ganadores g WHERE g.persona_id = p.id)
+ORDER BY p.id`
+	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +86,11 @@ func (r *SQLServerRepository) availablePeople(ctx context.Context) ([]models.Per
 }
 
 func (r *SQLServerRepository) availablePrizes(ctx context.Context) ([]models.Prize, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT id, nombre, descripcion FROM premios WHERE entregado = 0 ORDER BY id`)
+	query := `SELECT pr.id, pr.nombre, pr.descripcion
+FROM premios pr
+WHERE NOT EXISTS (SELECT 1 FROM ganadores g WHERE g.premio_id = pr.id)
+ORDER BY pr.id`
+	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -100,11 +108,11 @@ func (r *SQLServerRepository) availablePrizes(ctx context.Context) ([]models.Pri
 }
 
 func (r *SQLServerRepository) recentWinners(ctx context.Context, limit int) ([]models.WinnerRecord, error) {
-	query := `SELECT TOP(@p1) w.id, w.entregado_en, p.id, p.nombre, p.email, r.id, r.nombre, r.descripcion
-              FROM ganadores w
-              INNER JOIN personas p ON p.id = w.persona_id
-              INNER JOIN premios r ON r.id = w.premio_id
-              ORDER BY w.entregado_en DESC`
+	query := `SELECT TOP(@p1) w.id, w.entregado_en, p.id, p.nombre, '' AS email, r.id, r.nombre, r.descripcion
+FROM ganadores w
+INNER JOIN personas p ON p.id = w.persona_id
+INNER JOIN premios r ON r.id = w.premio_id
+ORDER BY w.entregado_en DESC`
 	rows, err := r.db.QueryContext(ctx, query, limit)
 	if err != nil {
 		return nil, err
@@ -123,7 +131,10 @@ func (r *SQLServerRepository) recentWinners(ctx context.Context, limit int) ([]m
 }
 
 func (r *SQLServerRepository) pickRandomPerson(ctx context.Context, tx *sql.Tx) (models.Person, error) {
-	row := tx.QueryRowContext(ctx, `SELECT TOP 1 id, nombre, email FROM personas WHERE entregado = 0 ORDER BY NEWID()`)
+	row := tx.QueryRowContext(ctx, `SELECT TOP 1 p.id, p.nombre, '' AS email
+FROM personas p
+WHERE NOT EXISTS (SELECT 1 FROM ganadores g WHERE g.persona_id = p.id)
+ORDER BY NEWID()`)
 	var p models.Person
 	if err := row.Scan(&p.ID, &p.Name, &p.Email); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -131,22 +142,19 @@ func (r *SQLServerRepository) pickRandomPerson(ctx context.Context, tx *sql.Tx) 
 		}
 		return models.Person{}, err
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE personas SET entregado = 1 WHERE id = @p1`, p.ID); err != nil {
-		return models.Person{}, err
-	}
 	return p, nil
 }
 
 func (r *SQLServerRepository) pickRandomPrize(ctx context.Context, tx *sql.Tx) (models.Prize, error) {
-	row := tx.QueryRowContext(ctx, `SELECT TOP 1 id, nombre, descripcion FROM premios WHERE entregado = 0 ORDER BY NEWID()`)
+	row := tx.QueryRowContext(ctx, `SELECT TOP 1 pr.id, pr.nombre, pr.descripcion
+FROM premios pr
+WHERE NOT EXISTS (SELECT 1 FROM ganadores g WHERE g.premio_id = pr.id)
+ORDER BY NEWID()`)
 	var p models.Prize
 	if err := row.Scan(&p.ID, &p.Name, &p.Description); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return models.Prize{}, ErrNoPrizes
 		}
-		return models.Prize{}, err
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE premios SET entregado = 1 WHERE id = @p1`, p.ID); err != nil {
 		return models.Prize{}, err
 	}
 	return p, nil
