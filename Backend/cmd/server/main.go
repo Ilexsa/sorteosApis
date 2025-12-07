@@ -22,7 +22,10 @@ func main() {
 		adminPassword = "navidad2024"
 	}
 
-	repo, cleanup := buildRepository()
+	repo, cleanup, err := buildRepository()
+	if err != nil {
+		log.Fatalf("No se pudo inicializar el repositorio: %v", err)
+	}
 	defer cleanup()
 	service := raffle.NewService(repo)
 	auth := raffle.NewAuthService(adminPassword)
@@ -66,16 +69,15 @@ func main() {
 	}
 }
 
-func buildRepository() (repository.Repository, func()) {
+func buildRepository() (repository.Repository, func(), error) {
 	if strings.EqualFold(os.Getenv("USE_INMEMORY"), "true") {
 		log.Printf("USE_INMEMORY activo, usando datos de ejemplo en memoria")
-		return repository.NewInMemoryRepository(), func() {}
+		return repository.NewInMemoryRepository(), func() {}, nil
 	}
 
 	db, err := connectSQLServer()
 	if err != nil {
-		log.Printf("No se pudo conectar a SQL Server, usando repositorio en memoria: %v", err)
-		return repository.NewInMemoryRepository(), func() {}
+		return nil, func() {}, err
 	}
 
 	log.Printf("Conectado a SQL Server correctamente")
@@ -83,19 +85,21 @@ func buildRepository() (repository.Repository, func()) {
 		if err := db.Close(); err != nil {
 			log.Printf("Error al cerrar la conexión a SQL Server: %v", err)
 		}
-	}
+	}, nil
 }
 
 func connectSQLServer() (*sql.DB, error) {
 	connStr := os.Getenv("SQLSERVER_CONN")
 	if connStr == "" {
 		host := getenv("SQLSERVER_HOST", "localhost")
+		port := getenv("SQLSERVER_PORT", "1433")
 		encrypt := getenv("SQLSERVER_ENCRYPT", "disable")
+		trust := getenv("SQLSERVER_TRUST_CERT", "true")
 		user := getenv("SQLSERVER_USER", "sa")
 		pass := getenv("SQLSERVER_PASSWORD", "")
 		db := getenv("SQLSERVER_DB", "SORTEOS")
-		connStr = fmt.Sprintf("server=%s;user id=%s;password=%s;database=%s;encrypt=%s", host,
-			user, pass, db, encrypt)
+		connStr = fmt.Sprintf("server=%s;port=%s;user id=%s;password=%s;database=%s;encrypt=%s;TrustServerCertificate=%s;connection timeout=5",
+			host, port, user, pass, db, encrypt, trust)
 	}
 
 	sqlDB, err := sql.Open("sqlserver", connStr)
