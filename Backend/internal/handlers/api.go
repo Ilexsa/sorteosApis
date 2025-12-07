@@ -73,6 +73,10 @@ func (h *APIHandler) AdminOnly(next gin.HandlerFunc) gin.HandlerFunc {
 
 func (h *APIHandler) StreamEvents(c *gin.Context) {
 	client := h.service.RegisterClient()
+	go func() {
+		<-c.Request.Context().Done()
+		h.service.UnregisterClient(client)
+	}()
 	c.Stream(func(w io.Writer) bool {
 		if evt, ok := <-client.Chan(); ok {
 			c.SSEvent(evt.Type, evt.Data)
