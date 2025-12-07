@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(/\/$/, '')
@@ -23,19 +23,26 @@ function launchConfetti() {
 }
 
 const SnowOverlay = () => {
-  const flakes = useMemo(() => Array.from({ length: 80 }, (_, idx) => idx), [])
+  const flakes = useMemo(() => Array.from({ length: 80 }, (_, idx) => ({
+    id: idx,
+    left: `${Math.random() * 100}%`,
+    animationDelay: `${Math.random() * 3}s`,
+    animationDuration: `${6 + Math.random() * 4}s`,
+    opacity: 0.4 + Math.random() * 0.4,
+    fontSize: `${12 + Math.random() * 10}px`
+  })), [])
   return (
     <div className="snow-overlay" aria-hidden="true">
       {flakes.map((flake) => (
         <span
-          key={flake}
+          key={flake.id}
           className="snowflake"
           style={{
-            left: `${Math.random() * 100}%`,
-            animationDelay: `${Math.random() * 3}s`,
-            animationDuration: `${6 + Math.random() * 4}s`,
-            opacity: 0.4 + Math.random() * 0.4,
-            fontSize: `${12 + Math.random() * 10}px`
+            left: flake.left,
+            animationDelay: flake.animationDelay,
+            animationDuration: flake.animationDuration,
+            opacity: flake.opacity,
+            fontSize: flake.fontSize
           }}
         >
           ❄
@@ -88,6 +95,12 @@ function App() {
 
   const headers = useMemo(() => token ? { Authorization: `Bearer ${token}` } : {}, [token])
 
+  const triggerSpin = useCallback(() => {
+    setSpinning(true)
+    clearTimeout(spinTimeoutRef.current)
+    spinTimeoutRef.current = setTimeout(() => setSpinning(false), 3200)
+  }, [])
+
   useEffect(() => {
     const loadState = async () => {
       try {
@@ -116,17 +129,15 @@ function App() {
       playChime()
       triggerSpin()
     }
+    const onDrawStart = () => {
+      triggerSpin()
+    }
     eventSource.addEventListener('state', onState)
     eventSource.addEventListener('winner', onWinner)
+    eventSource.addEventListener('draw-start', onDrawStart)
     eventSource.onerror = () => setError('La conexión en tiempo real tuvo un problema')
     return () => eventSource.close()
-  }, [playChime])
-
-  const triggerSpin = () => {
-    setSpinning(true)
-    clearTimeout(spinTimeoutRef.current)
-    spinTimeoutRef.current = setTimeout(() => setSpinning(false), 3200)
-  }
+  }, [playChime, triggerSpin])
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -150,7 +161,6 @@ function App() {
     if (!token) return
     setLoadingDraw(true)
     setError('')
-    triggerSpin()
     try {
       await new Promise(resolve => setTimeout(resolve, 3000))
       const res = await fetch(`${API_BASE}/api/draw`, {
