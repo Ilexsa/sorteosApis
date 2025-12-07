@@ -40,11 +40,14 @@ func (s *Service) RegisterClient() *Client {
 	client := &Client{ch: make(chan Event, 4), done: make(chan struct{})}
 	s.clientsMu.Lock()
 	s.clients[client] = struct{}{}
+	s.clientsMu.Unlock()
+
 	if state, err := s.State(context.Background()); err == nil {
 		client.ch <- Event{Type: "state", Data: state}
 	} else {
 		client.ch <- Event{Type: "error", Data: err.Error()}
 	}
+
 	return client
 }
 
