@@ -3,6 +3,7 @@ package raffle
 import (
 	"context"
 	"sync"
+	"time"
 
 	"apiSorteos/internal/models"
 	"apiSorteos/internal/repository"
@@ -88,6 +89,7 @@ func (s *Service) State(ctx context.Context) (models.RaffleState, error) {
 
 func (s *Service) Draw(ctx context.Context) (models.WinnerRecord, error) {
 	s.drawMu.Lock()
+	s.broadcast(Event{Type: "draw-start", Data: map[string]interface{}{"startedAt": time.Now().UTC()}})
 	record, err := s.repo.DrawRandom(ctx)
 	s.drawMu.Unlock()
 	if err != nil {

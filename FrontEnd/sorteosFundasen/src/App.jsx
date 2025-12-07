@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(/\/$/, '')
@@ -95,6 +95,12 @@ function App() {
 
   const headers = useMemo(() => token ? { Authorization: `Bearer ${token}` } : {}, [token])
 
+  const triggerSpin = useCallback(() => {
+    setSpinning(true)
+    clearTimeout(spinTimeoutRef.current)
+    spinTimeoutRef.current = setTimeout(() => setSpinning(false), 3200)
+  }, [])
+
   useEffect(() => {
     const loadState = async () => {
       try {
@@ -123,17 +129,15 @@ function App() {
       playChime()
       triggerSpin()
     }
+    const onDrawStart = () => {
+      triggerSpin()
+    }
     eventSource.addEventListener('state', onState)
     eventSource.addEventListener('winner', onWinner)
+    eventSource.addEventListener('draw-start', onDrawStart)
     eventSource.onerror = () => setError('La conexión en tiempo real tuvo un problema')
     return () => eventSource.close()
-  }, [playChime])
-
-  const triggerSpin = () => {
-    setSpinning(true)
-    clearTimeout(spinTimeoutRef.current)
-    spinTimeoutRef.current = setTimeout(() => setSpinning(false), 3200)
-  }
+  }, [playChime, triggerSpin])
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -157,7 +161,6 @@ function App() {
     if (!token) return
     setLoadingDraw(true)
     setError('')
-    triggerSpin()
     try {
       await new Promise(resolve => setTimeout(resolve, 3000))
       const res = await fetch(`${API_BASE}/api/draw`, {
