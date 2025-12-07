@@ -112,7 +112,7 @@ func (r *SQLServerRepository) recentWinners(ctx context.Context, limit int) ([]m
 FROM ganadores w
 INNER JOIN personas p ON p.id = w.persona_id
 INNER JOIN premios r ON r.id = w.premio_id
-ORDER BY w.entregado_en DESC`
+ORDER BY w.entregado_en DESC, w.id DESC`
 	rows, err := r.db.QueryContext(ctx, query, limit)
 	if err != nil {
 		return nil, err
@@ -162,9 +162,9 @@ ORDER BY NEWID()`)
 
 func (r *SQLServerRepository) insertWinner(ctx context.Context, tx *sql.Tx, person models.Person, prize models.Prize) (models.WinnerRecord, error) {
 	awardedAt := time.Now().UTC()
-	row := tx.QueryRowContext(ctx, `INSERT INTO ganadores (persona_id, premio_id, entregado_en) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3)`, person.ID, prize.ID, awardedAt)
+	row := tx.QueryRowContext(ctx, `INSERT INTO ganadores (persona_id, premio_id, entregado_en) OUTPUT INSERTED.id, INSERTED.entregado_en VALUES (@p1, @p2, @p3)`, person.ID, prize.ID, awardedAt)
 	var winnerID int64
-	if err := row.Scan(&winnerID); err != nil {
+	if err := row.Scan(&winnerID, &awardedAt); err != nil {
 		return models.WinnerRecord{}, fmt.Errorf("no se pudo obtener el id del ganador: %w", err)
 	}
 
