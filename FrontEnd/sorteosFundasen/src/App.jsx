@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(/\/$/, '')
 
 const formatDate = (value) => new Intl.DateTimeFormat('es-ES', {
   hour: '2-digit',
@@ -46,7 +46,19 @@ function App() {
   const headers = useMemo(() => token ? { Authorization: `Bearer ${token}` } : {}, [token])
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/state`).then(res => res.json()).then(setState).catch(() => setError('No se pudo cargar el estado inicial'))
+    const loadState = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/state`)
+        if (!res.ok) {
+          throw new Error('No se pudo cargar el estado inicial')
+        }
+        const data = await res.json()
+        setState(data)
+      } catch (err) {
+        setError(err.message)
+      }
+    }
+    loadState()
   }, [])
 
   useEffect(() => {
