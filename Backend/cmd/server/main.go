@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"apiSorteos/internal/handlers"
@@ -21,8 +22,8 @@ func main() {
 		adminPassword = "navidad2024"
 	}
 
-	db := mustConnectSQLServer()
-	repo := repository.NewSQLServerRepository(db)
+	repo, cleanup := buildRepository()
+	defer cleanup()
 	service := raffle.NewService(repo)
 	auth := raffle.NewAuthService(adminPassword)
 
@@ -65,21 +66,41 @@ func main() {
 	}
 }
 
-func mustConnectSQLServer() *sql.DB {
+func buildRepository() (repository.Repository, func()) {
+	if strings.EqualFold(os.Getenv("USE_INMEMORY"), "true") {
+		log.Printf("USE_INMEMORY activo, usando datos de ejemplo en memoria")
+		return repository.NewInMemoryRepository(), func() {}
+	}
+
+	db, err := connectSQLServer()
+	if err != nil {
+		log.Printf("No se pudo conectar a SQL Server, usando repositorio en memoria: %v", err)
+		return repository.NewInMemoryRepository(), func() {}
+	}
+
+	log.Printf("Conectado a SQL Server correctamente")
+	return repository.NewSQLServerRepository(db), func() {
+		if err := db.Close(); err != nil {
+			log.Printf("Error al cerrar la conexión a SQL Server: %v", err)
+		}
+	}
+}
+
+func connectSQLServer() (*sql.DB, error) {
 	connStr := os.Getenv("SQLSERVER_CONN")
 	if connStr == "" {
 		host := getenv("SQLSERVER_HOST", "localhost")
-		encrypt:=getenv("SQLSERVER_ENCRYPT", "disable")
+		encrypt := getenv("SQLSERVER_ENCRYPT", "disable")
 		user := getenv("SQLSERVER_USER", "sa")
 		pass := getenv("SQLSERVER_PASSWORD", "")
 		db := getenv("SQLSERVER_DB", "SORTEOS")
-		connStr = fmt.Sprintf("server=%s;user id=%s;password=%s;database=%s;encrypt=%s",host,
-	user, pass, db, encrypt)
+		connStr = fmt.Sprintf("server=%s;user id=%s;password=%s;database=%s;encrypt=%s", host,
+			user, pass, db, encrypt)
 	}
 
 	sqlDB, err := sql.Open("sqlserver", connStr)
 	if err != nil {
-		log.Fatalf("No se pudo crear el pool de conexiones: %v", err)
+		return nil, fmt.Errorf("no se pudo crear el pool de conexiones: %w", err)
 	}
 	sqlDB.SetConnMaxIdleTime(5 * time.Minute)
 	sqlDB.SetConnMaxLifetime(30 * time.Minute)
@@ -87,9 +108,9 @@ func mustConnectSQLServer() *sql.DB {
 	sqlDB.SetMaxIdleConns(5)
 
 	if err := sqlDB.Ping(); err != nil {
-		log.Fatalf("No se pudo conectar a SQL Server: %v", err)
+		return nil, fmt.Errorf("no se pudo conectar a SQL Server: %w", err)
 	}
-	return sqlDB
+	return sqlDB, nil
 }
 
 func getenv(key, fallback string) string {
