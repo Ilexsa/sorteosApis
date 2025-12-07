@@ -9,9 +9,10 @@ import (
 )
 
 type Service struct {
-	repo    repository.Repository
-	mu      sync.Mutex
-	clients map[*Client]struct{}
+	repo      repository.Repository
+	clientsMu sync.Mutex
+	drawMu    sync.Mutex
+	clients   map[*Client]struct{}
 }
 
 type Client struct {
@@ -36,9 +37,8 @@ func NewService(repo repository.Repository) *Service {
 }
 
 func (s *Service) RegisterClient() *Client {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	client := &Client{ch: make(chan Event, 4), done: make(chan struct{})}
+	s.clientsMu.Lock()
 	s.clients[client] = struct{}{}
 	if state, err := s.State(context.Background()); err == nil {
 		client.ch <- Event{Type: "state", Data: state}
@@ -49,8 +49,8 @@ func (s *Service) RegisterClient() *Client {
 }
 
 func (s *Service) UnregisterClient(c *Client) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.clientsMu.Lock()
+	defer s.clientsMu.Unlock()
 	if _, ok := s.clients[c]; ok {
 		delete(s.clients, c)
 		close(c.ch)
@@ -59,8 +59,8 @@ func (s *Service) UnregisterClient(c *Client) {
 }
 
 func (s *Service) broadcast(evt Event) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.clientsMu.Lock()
+	defer s.clientsMu.Unlock()
 	for c := range s.clients {
 		select {
 		case c.ch <- evt:
@@ -84,10 +84,9 @@ func (s *Service) State(ctx context.Context) (models.RaffleState, error) {
 }
 
 func (s *Service) Draw(ctx context.Context) (models.WinnerRecord, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+	s.drawMu.Lock()
 	record, err := s.repo.DrawRandom(ctx)
+	s.drawMu.Unlock()
 	if err != nil {
 		return models.WinnerRecord{}, err
 	}
