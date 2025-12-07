@@ -23,19 +23,26 @@ function launchConfetti() {
 }
 
 const SnowOverlay = () => {
-  const flakes = useMemo(() => Array.from({ length: 80 }, (_, idx) => idx), [])
+  const flakes = useMemo(() => Array.from({ length: 80 }, (_, idx) => ({
+    id: idx,
+    left: `${Math.random() * 100}%`,
+    animationDelay: `${Math.random() * 3}s`,
+    animationDuration: `${6 + Math.random() * 4}s`,
+    opacity: 0.4 + Math.random() * 0.4,
+    fontSize: `${12 + Math.random() * 10}px`
+  })), [])
   return (
     <div className="snow-overlay" aria-hidden="true">
       {flakes.map((flake) => (
         <span
-          key={flake}
+          key={flake.id}
           className="snowflake"
           style={{
-            left: `${Math.random() * 100}%`,
-            animationDelay: `${Math.random() * 3}s`,
-            animationDuration: `${6 + Math.random() * 4}s`,
-            opacity: 0.4 + Math.random() * 0.4,
-            fontSize: `${12 + Math.random() * 10}px`
+            left: flake.left,
+            animationDelay: flake.animationDelay,
+            animationDuration: flake.animationDuration,
+            opacity: flake.opacity,
+            fontSize: flake.fontSize
           }}
         >
           ❄
