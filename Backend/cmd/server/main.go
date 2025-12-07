@@ -75,17 +75,28 @@ func buildRepository() (repository.Repository, func(), error) {
 		return repository.NewInMemoryRepository(), func() {}, nil
 	}
 
+	repo, cleanup, err := buildSQLServerRepository()
+	if err == nil {
+		return repo, cleanup, nil
+	}
+
+	log.Printf("No se pudo conectar a SQL Server (%v). Activando repositorio en memoria para que el servidor continúe ejecutándose", err)
+	return repository.NewInMemoryRepository(), func() {}, nil
+}
+
+func buildSQLServerRepository() (repository.Repository, func(), error) {
 	db, err := connectSQLServer()
 	if err != nil {
 		return nil, func() {}, err
 	}
 
 	log.Printf("Conectado a SQL Server correctamente")
-	return repository.NewSQLServerRepository(db), func() {
+	cleanup := func() {
 		if err := db.Close(); err != nil {
 			log.Printf("Error al cerrar la conexión a SQL Server: %v", err)
 		}
-	}, nil
+	}
+	return repository.NewSQLServerRepository(db), cleanup, nil
 }
 
 func connectSQLServer() (*sql.DB, error) {
