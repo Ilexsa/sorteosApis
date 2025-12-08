@@ -91,12 +91,20 @@ function App() {
   const spinTimeoutRef = useRef(null)
   const [spinning, setSpinning] = useState(false)
   const [showModal, setShowModal] = useState(false)
+  const [showAllPeople, setShowAllPeople] = useState(false)
+  const [showAllPrizes, setShowAllPrizes] = useState(false)
   const playChime = useAudioChime()
 
   const headers = useMemo(() => token ? { Authorization: `Bearer ${token}` } : {}, [token])
 
   const triggerSpin = useCallback(() => {
-    setSpinning(true)
+    setSpinning((prev) => {
+      if (prev) {
+        requestAnimationFrame(() => setSpinning(true))
+        return false
+      }
+      return true
+    })
     clearTimeout(spinTimeoutRef.current)
     spinTimeoutRef.current = setTimeout(() => setSpinning(false), 3200)
   }, [])
@@ -162,6 +170,7 @@ function App() {
     setLoadingDraw(true)
     setError('')
     try {
+      triggerSpin()
       await new Promise(resolve => setTimeout(resolve, 3000))
       const res = await fetch(`${API_BASE}/api/draw`, {
         method: 'POST',
@@ -183,6 +192,9 @@ function App() {
   const recentWinners = state?.recentWinners || []
   const waitingPeople = state?.waitingPeople || []
   const upcomingPrizes = state?.upcomingPrizes || []
+
+  const limitedPeople = showAllPeople ? waitingPeople : waitingPeople.slice(0, 30)
+  const limitedPrizes = showAllPrizes ? upcomingPrizes : upcomingPrizes.slice(0, 30)
 
   useEffect(() => {
     if (!lastWinner) return
@@ -241,20 +253,40 @@ function App() {
         </section>
 
         <section className="panel">
-          <h2>Participantes en espera ({waitingPeople.length})</h2>
-          <div className="chips">
-            {waitingPeople.map(person => <span key={person.id} className="chip">{person.name}</span>)}
-            {waitingPeople.length === 0 && <p className="muted">Todos los asistentes ya tienen obsequio</p>}
+          <div className="panel-header">
+            <h2>Participantes en espera ({waitingPeople.length})</h2>
+            {waitingPeople.length > 30 && (
+              <button type="button" className="ghost" onClick={() => setShowAllPeople(v => !v)}>
+                {showAllPeople ? 'Ver menos' : 'Ver más'}
+              </button>
+            )}
+          </div>
+          <div className={`chips-wrapper ${showAllPeople ? 'expanded' : ''}`}>
+            <div className="chips">
+              {limitedPeople.map(person => <span key={person.id} className="chip">{person.name}</span>)}
+              {waitingPeople.length === 0 && <p className="muted">Todos los asistentes ya tienen obsequio</p>}
+            </div>
+            {!showAllPeople && waitingPeople.length > 30 && <div className="fade" aria-hidden="true" />}
           </div>
         </section>
 
         <section className="panel">
-          <h2>Premios restantes ({upcomingPrizes.length})</h2>
-          <div className="chips prizes">
-            {upcomingPrizes.map(prize => (
-              <span key={prize.id} className="chip prize">{prize.name}</span>
-            ))}
-            {upcomingPrizes.length === 0 && <p className="muted">No quedan premios por asignar</p>}
+          <div className="panel-header">
+            <h2>Premios restantes ({upcomingPrizes.length})</h2>
+            {upcomingPrizes.length > 30 && (
+              <button type="button" className="ghost" onClick={() => setShowAllPrizes(v => !v)}>
+                {showAllPrizes ? 'Ver menos' : 'Ver más'}
+              </button>
+            )}
+          </div>
+          <div className={`chips-wrapper ${showAllPrizes ? 'expanded' : ''}`}>
+            <div className="chips prizes">
+              {limitedPrizes.map(prize => (
+                <span key={prize.id} className="chip prize">{prize.name}</span>
+              ))}
+              {upcomingPrizes.length === 0 && <p className="muted">No quedan premios por asignar</p>}
+            </div>
+            {!showAllPrizes && upcomingPrizes.length > 30 && <div className="fade" aria-hidden="true" />}
           </div>
         </section>
       </main>
