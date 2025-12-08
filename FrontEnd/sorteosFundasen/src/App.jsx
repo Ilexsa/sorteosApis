@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(/\/$/, '')
+const API_BASE = ('http://10.1.0.6:8080')
 
 const CONFETTI_COLORS = ['#f95738', '#f7b733', '#38bdf8', '#a78bfa', '#34d399']
 
