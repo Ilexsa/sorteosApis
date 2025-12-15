@@ -168,6 +168,13 @@ body {
   border-bottom: 24px solid #fff;
 }
 
+.wheel-large::after {
+  top: -24px;
+  border-left-width: 18px;
+  border-right-width: 18px;
+  border-bottom-width: 28px;
+}
+
 .wheel-inner {
   width: 180px;
   height: 180px;
@@ -386,6 +393,29 @@ body {
   box-shadow: 0 20px 60px rgba(0,0,0,0.45);
   min-width: 320px;
   animation: popIn 0.3s ease;
+}
+
+.draw-modal {
+  width: min(860px, 94vw);
+  text-align: left;
+}
+
+.modal-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.modal-wheel {
+  display: grid;
+  place-items: center;
+  margin: 18px 0 6px;
+}
+
+.ghost.small {
+  padding: 6px 10px;
+  font-size: 14px;
 }
 
 .winner-name {

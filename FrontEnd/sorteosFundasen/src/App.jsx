@@ -180,6 +180,9 @@ function App() {
     const onWinner = (event) => {
       const payload = JSON.parse(event.data)
       setLastWinner(payload)
+      setModalWinner(payload)
+      setDrawParticipant(payload.person.name)
+      setShowDrawModal(true)
       playChime()
       settleToPrize(payload.prize)
     }
@@ -241,10 +244,7 @@ function App() {
 
   useEffect(() => {
     if (!lastWinner) return
-    setShowModal(true)
     launchConfetti()
-    const timer = setTimeout(() => setShowModal(false), 4000)
-    return () => clearTimeout(timer)
   }, [lastWinner])
 
   const handleWheelTransitionEnd = () => {
@@ -370,12 +370,44 @@ function App() {
         </div>
       )}
 
-      {showModal && lastWinner && (
+      {showDrawModal && (
         <div className="modal-backdrop">
-          <div className="modal-card">
-            <p className="muted">¡Tenemos ganador!</p>
-            <h3 className="winner-name">{lastWinner.person.name}</h3>
-            <p className="prize-name">{lastWinner.prize.name}</p>
+          <div className="modal-card draw-modal">
+            <div className="modal-heading">
+              <div>
+                <p className="muted">Participante que recibirá el premio</p>
+                <h3 className="winner-name">{drawParticipant || 'Seleccionando participante...'}</h3>
+                <p className="prize-name">{modalWinner ? `Premio: ${modalWinner.prize.name}` : 'Ruleta cargada con los premios disponibles'}</p>
+              </div>
+              <button className="ghost small" type="button" onClick={() => setShowDrawModal(false)}>Cerrar</button>
+            </div>
+            <div className="modal-wheel">
+              <div
+                className={`wheel wheel-large ${spinning ? 'spinning' : ''} ${isSettling ? 'settling' : ''}`}
+                style={{ background: wheelGradient, transform: `rotate(${rotation}deg)` }}
+                onTransitionEnd={handleWheelTransitionEnd}
+              >
+                <div className="wheel-labels">
+                  {displayPrizes.map((prize, idx) => {
+                    const step = 360 / displayPrizes.length
+                    const angle = idx * step
+                    return (
+                      <div
+                        key={prize.id}
+                        className="wheel-segment"
+                        style={{ transform: `rotate(${angle}deg) translateY(-50%)` }}
+                      >
+                        <span style={{ transform: `rotate(${-angle}deg)` }}>{prize.name}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="wheel-inner">
+                  <div className="wheel-center">🎁</div>
+                </div>
+              </div>
+            </div>
+            <p className="helper">El giro se comparte en todas las pantallas y se detendrá automáticamente en el premio asignado.</p>
           </div>
         </div>
       )}
