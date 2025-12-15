@@ -4,6 +4,13 @@ import './App.css'
 const API_BASE = ('http://10.1.0.6:8080')
 
 const CONFETTI_COLORS = ['#f95738', '#f7b733', '#38bdf8', '#a78bfa', '#34d399']
+const SEGMENT_COLORS = ['#f87171', '#fb923c', '#facc15', '#34d399', '#60a5fa', '#a78bfa', '#f472b6']
+const FALLBACK_PRIZES = [
+  { id: -1, name: 'Pendiente', description: '' },
+  { id: -2, name: 'Pendiente', description: '' },
+  { id: -3, name: 'Pendiente', description: '' },
+  { id: -4, name: 'Pendiente', description: '' }
+]
 
 function launchConfetti() {
   const wrapper = document.createElement('div')
@@ -88,25 +95,72 @@ function App() {
   const [lastWinner, setLastWinner] = useState(null)
   const [loadingDraw, setLoadingDraw] = useState(false)
   const [error, setError] = useState('')
-  const spinTimeoutRef = useRef(null)
   const [spinning, setSpinning] = useState(false)
-  const [showModal, setShowModal] = useState(false)
+  const [isSettling, setIsSettling] = useState(false)
+  const [rotation, setRotation] = useState(0)
+  const [showDrawModal, setShowDrawModal] = useState(false)
+  const [drawParticipant, setDrawParticipant] = useState('')
+  const [modalWinner, setModalWinner] = useState(null)
   const [showAllPeople, setShowAllPeople] = useState(false)
   const [showAllPrizes, setShowAllPrizes] = useState(false)
   const playChime = useAudioChime()
+  const wheelSnapshotRef = useRef([])
 
   const headers = useMemo(() => token ? { Authorization: `Bearer ${token}` } : {}, [token])
 
-  const triggerSpin = useCallback(() => {
-    setSpinning((prev) => {
-      if (prev) {
-        requestAnimationFrame(() => setSpinning(true))
-        return false
-      }
-      return true
+  const wheelPrizes = useMemo(
+    () => (state?.upcomingPrizes?.length ? state.upcomingPrizes : FALLBACK_PRIZES),
+    [state?.upcomingPrizes]
+  )
+
+  const displayPrizes = useMemo(() => {
+    if (spinning || isSettling) {
+      return wheelSnapshotRef.current.length ? wheelSnapshotRef.current : wheelPrizes
+    }
+    return wheelPrizes
+  }, [isSettling, spinning, wheelPrizes])
+
+  const wheelGradient = useMemo(() => {
+    if (!displayPrizes.length) return undefined
+    const step = 360 / displayPrizes.length
+    return `conic-gradient(${displayPrizes.map((_, idx) => {
+      const from = idx * step
+      const to = (idx + 1) * step
+      return `${SEGMENT_COLORS[idx % SEGMENT_COLORS.length]} ${from}deg ${to}deg`
+    }).join(',')})`
+  }, [displayPrizes])
+
+  const recordWheelSnapshot = useCallback((snapshot) => {
+    const source = snapshot && snapshot.length ? snapshot : wheelPrizes
+    wheelSnapshotRef.current = source
+  }, [wheelPrizes])
+
+  const startSpin = useCallback((snapshot) => {
+    const source = snapshot && snapshot.length ? snapshot : wheelPrizes
+    if (!source.length) return
+    recordWheelSnapshot(source)
+    setIsSettling(false)
+    setSpinning(true)
+    setRotation((prev) => prev + 720 + Math.random() * 180)
+  }, [recordWheelSnapshot, wheelPrizes])
+
+  const settleToPrize = useCallback((prize) => {
+    const prizes = wheelSnapshotRef.current.length ? wheelSnapshotRef.current : wheelPrizes
+    if (!prizes.length || !prize) return
+    const step = 360 / prizes.length
+    const index = Math.max(prizes.findIndex((p) => p.id === prize.id), 0)
+    const targetAngle = index * step + step / 2
+    setIsSettling(true)
+    setRotation((prev) => {
+      const base = prev % 360
+      return base + 1080 + (360 - targetAngle)
     })
-    clearTimeout(spinTimeoutRef.current)
-    spinTimeoutRef.current = setTimeout(() => setSpinning(false), 3200)
+  }, [wheelPrizes])
+
+  const openDrawModal = useCallback(() => {
+    setShowDrawModal(true)
+    setModalWinner(null)
+    setDrawParticipant('Seleccionando participante...')
   }, [])
 
   useEffect(() => {
@@ -134,18 +188,22 @@ function App() {
     const onWinner = (event) => {
       const payload = JSON.parse(event.data)
       setLastWinner(payload)
+      setModalWinner(payload)
+      setDrawParticipant(payload.person.name)
+      setShowDrawModal(true)
       playChime()
-      triggerSpin()
+      settleToPrize(payload.prize)
     }
     const onDrawStart = () => {
-      triggerSpin()
+      openDrawModal()
+      startSpin(state?.upcomingPrizes)
     }
     eventSource.addEventListener('state', onState)
     eventSource.addEventListener('winner', onWinner)
     eventSource.addEventListener('draw-start', onDrawStart)
     eventSource.onerror = () => setError('La conexión en tiempo real tuvo un problema')
     return () => eventSource.close()
-  }, [playChime, triggerSpin])
+  }, [openDrawModal, playChime, settleToPrize, startSpin, state?.upcomingPrizes])
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -170,8 +228,8 @@ function App() {
     setLoadingDraw(true)
     setError('')
     try {
-      triggerSpin()
-      await new Promise(resolve => setTimeout(resolve, 3000))
+      openDrawModal()
+      startSpin(state?.upcomingPrizes)
       const res = await fetch(`${API_BASE}/api/draw`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...headers }
@@ -180,8 +238,6 @@ function App() {
       if (!res.ok) {
         throw new Error(data.error || 'No se pudo ejecutar el sorteo')
       }
-      setLastWinner(data)
-      playChime()
     } catch (err) {
       setError(err.message)
     } finally {
@@ -198,11 +254,17 @@ function App() {
 
   useEffect(() => {
     if (!lastWinner) return
-    setShowModal(true)
     launchConfetti()
-    const timer = setTimeout(() => setShowModal(false), 4000)
-    return () => clearTimeout(timer)
   }, [lastWinner])
+
+  const handleWheelTransitionEnd = () => {
+    if (isSettling) {
+      setSpinning(false)
+      setIsSettling(false)
+      return
+    }
+    setSpinning(false)
+  }
 
   return (
     <div className="page">
@@ -225,11 +287,8 @@ function App() {
 
       <main className="grid">
         <section className="panel wheel-card">
-          <div className={`wheel ${spinning ? 'spinning' : ''}`}>
-            <div className="wheel-inner">
-              <div className="wheel-center">🎁</div>
-            </div>
-          </div>
+          <h2>Obsequios en vivo</h2>
+          <p className="subtitle">Presiona el botón para abrir la ruleta llena con todos los premios disponibles y compartir el giro con el participante seleccionado.</p>
           <button className="cta" disabled={!token || loadingDraw} onClick={handleDraw}>
             {loadingDraw ? 'Girando...' : 'Obsequio!'}
           </button>
@@ -299,12 +358,44 @@ function App() {
         </div>
       )}
 
-      {showModal && lastWinner && (
+      {showDrawModal && (
         <div className="modal-backdrop">
-          <div className="modal-card">
-            <p className="muted">¡Tenemos ganador!</p>
-            <h3 className="winner-name">{lastWinner.person.name}</h3>
-            <p className="prize-name">{lastWinner.prize.name}</p>
+          <div className="modal-card draw-modal">
+            <div className="modal-heading">
+              <div>
+                <p className="muted">Participante que recibirá el premio</p>
+                <h3 className="winner-name">{drawParticipant || 'Seleccionando participante...'}</h3>
+                <p className="prize-name">{modalWinner ? `Premio: ${modalWinner.prize.name}` : 'Ruleta cargada con los premios disponibles'}</p>
+              </div>
+              <button className="ghost small" type="button" onClick={() => setShowDrawModal(false)}>Cerrar</button>
+            </div>
+            <div className="modal-wheel">
+              <div
+                className={`wheel wheel-large ${spinning ? 'spinning' : ''} ${isSettling ? 'settling' : ''}`}
+                style={{ background: wheelGradient, transform: `rotate(${rotation}deg)` }}
+                onTransitionEnd={handleWheelTransitionEnd}
+              >
+                <div className="wheel-labels">
+                  {displayPrizes.map((prize, idx) => {
+                    const step = 360 / displayPrizes.length
+                    const angle = idx * step
+                    return (
+                      <div
+                        key={prize.id}
+                        className="wheel-segment"
+                        style={{ transform: `rotate(${angle}deg) translateY(-50%)` }}
+                      >
+                        <span style={{ transform: `rotate(${-angle}deg)` }}>{prize.name}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="wheel-inner">
+                  <div className="wheel-center">🎁</div>
+                </div>
+              </div>
+            </div>
+            <p className="helper">El giro se comparte en todas las pantallas y se detendrá automáticamente en el premio asignado.</p>
           </div>
         </div>
       )}

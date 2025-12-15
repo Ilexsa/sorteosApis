@@ -142,15 +142,25 @@ body {
 
 .wheel {
   margin: 0 auto 16px;
-  width: 240px;
-  height: 240px;
+  width: 260px;
+  height: 260px;
   border-radius: 50%;
-  background: conic-gradient(#ff5f6d, #ffc371, #ff5f6d, #ffc371, #ff5f6d);
   display: grid;
   place-items: center;
   border: 8px solid rgba(255,255,255,0.35);
   box-shadow: 0 15px 50px rgba(0,0,0,0.4);
   position: relative;
+  overflow: hidden;
+  transition: transform 1.1s cubic-bezier(0.45, 0.1, 0.1, 1);
+  will-change: transform;
+}
+
+.wheel-large {
+  width: 440px;
+  height: 440px;
+  border-width: 10px;
+  max-width: 90vw;
+  max-height: 90vw;
 }
 
 .wheel::after {
@@ -164,6 +174,13 @@ body {
   border-left: 16px solid transparent;
   border-right: 16px solid transparent;
   border-bottom: 24px solid #fff;
+}
+
+.wheel-large::after {
+  top: -24px;
+  border-left-width: 18px;
+  border-right-width: 18px;
+  border-bottom-width: 28px;
 }
 
 .wheel-inner {
@@ -187,13 +204,43 @@ body {
   box-shadow: inset 0 0 0 4px rgba(255,255,255,0.2);
 }
 
-.spinning {
-  animation: spin 3s ease-in-out;
+.wheel.spinning {
+  box-shadow: 0 15px 50px rgba(0,0,0,0.45), 0 0 0 3px rgba(255,255,255,0.08);
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(1080deg); }
+.wheel.settling {
+  transition: transform 3.6s cubic-bezier(0.12, 0.68, 0.22, 1);
+}
+
+.wheel-labels {
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.wheel-segment {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 50%;
+  left: 50%;
+  transform-origin: center center;
+}
+
+.wheel-segment span {
+  position: absolute;
+  top: 5%;
+  left: 50%;
+  transform: translate(-50%, 0);
+  width: 42%;
+  font-weight: 700;
+  text-align: center;
+  font-size: 12px;
+  color: #0d1b2a;
+  text-shadow: 0 1px 3px rgba(255,255,255,0.6);
 }
 
 .cta {
@@ -354,6 +401,29 @@ body {
   box-shadow: 0 20px 60px rgba(0,0,0,0.45);
   min-width: 320px;
   animation: popIn 0.3s ease;
+}
+
+.draw-modal {
+  width: min(860px, 94vw);
+  text-align: left;
+}
+
+.modal-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.modal-wheel {
+  display: grid;
+  place-items: center;
+  margin: 18px 0 6px;
+}
+
+.ghost.small {
+  padding: 6px 10px;
+  font-size: 14px;
 }
 
 .winner-name {
