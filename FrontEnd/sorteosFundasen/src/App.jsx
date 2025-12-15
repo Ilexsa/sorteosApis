@@ -98,9 +98,7 @@ function App() {
   const [spinning, setSpinning] = useState(false)
   const [isSettling, setIsSettling] = useState(false)
   const [rotation, setRotation] = useState(0)
-  const [showDrawModal, setShowDrawModal] = useState(false)
-  const [drawParticipant, setDrawParticipant] = useState('')
-  const [modalWinner, setModalWinner] = useState(null)
+  const [showModal, setShowModal] = useState(false)
   const [showAllPeople, setShowAllPeople] = useState(false)
   const [showAllPrizes, setShowAllPrizes] = useState(false)
   const playChime = useAudioChime()
@@ -157,12 +155,6 @@ function App() {
     })
   }, [wheelPrizes])
 
-  const openDrawModal = useCallback(() => {
-    setShowDrawModal(true)
-    setModalWinner(null)
-    setDrawParticipant('Seleccionando participante...')
-  }, [])
-
   useEffect(() => {
     const loadState = async () => {
       try {
@@ -195,7 +187,6 @@ function App() {
       settleToPrize(payload.prize)
     }
     const onDrawStart = () => {
-      openDrawModal()
       startSpin(state?.upcomingPrizes)
     }
     eventSource.addEventListener('state', onState)
@@ -203,7 +194,7 @@ function App() {
     eventSource.addEventListener('draw-start', onDrawStart)
     eventSource.onerror = () => setError('La conexión en tiempo real tuvo un problema')
     return () => eventSource.close()
-  }, [openDrawModal, playChime, settleToPrize, startSpin, state?.upcomingPrizes])
+  }, [playChime, settleToPrize, startSpin, state?.upcomingPrizes])
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -228,7 +219,6 @@ function App() {
     setLoadingDraw(true)
     setError('')
     try {
-      openDrawModal()
       startSpin(state?.upcomingPrizes)
       const res = await fetch(`${API_BASE}/api/draw`, {
         method: 'POST',
@@ -287,8 +277,30 @@ function App() {
 
       <main className="grid">
         <section className="panel wheel-card">
-          <h2>Obsequios en vivo</h2>
-          <p className="subtitle">Presiona el botón para abrir la ruleta llena con todos los premios disponibles y compartir el giro con el participante seleccionado.</p>
+          <div
+            className={`wheel ${spinning ? 'spinning' : ''} ${isSettling ? 'settling' : ''}`}
+            style={{ background: wheelGradient, transform: `rotate(${rotation}deg)` }}
+            onTransitionEnd={handleWheelTransitionEnd}
+          >
+            <div className="wheel-labels">
+              {displayPrizes.map((prize, idx) => {
+                const step = 360 / displayPrizes.length
+                const angle = idx * step
+                return (
+                  <div
+                    key={prize.id}
+                    className="wheel-segment"
+                    style={{ transform: `rotate(${angle}deg) translateY(-50%)` }}
+                  >
+                    <span style={{ transform: `rotate(${-angle}deg)` }}>{prize.name}</span>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="wheel-inner">
+              <div className="wheel-center">🎁</div>
+            </div>
+          </div>
           <button className="cta" disabled={!token || loadingDraw} onClick={handleDraw}>
             {loadingDraw ? 'Girando...' : 'Obsequio!'}
           </button>

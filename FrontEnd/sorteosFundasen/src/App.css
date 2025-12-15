@@ -155,14 +155,6 @@ body {
   will-change: transform;
 }
 
-.wheel-large {
-  width: 440px;
-  height: 440px;
-  border-width: 10px;
-  max-width: 90vw;
-  max-height: 90vw;
-}
-
 .wheel::after {
   content: '';
   position: absolute;
@@ -232,13 +224,13 @@ body {
 
 .wheel-segment span {
   position: absolute;
-  top: 5%;
+  top: 6%;
   left: 50%;
   transform: translate(-50%, 0);
-  width: 42%;
+  width: 46%;
   font-weight: 700;
   text-align: center;
-  font-size: 12px;
+  font-size: 13px;
   color: #0d1b2a;
   text-shadow: 0 1px 3px rgba(255,255,255,0.6);
 }
