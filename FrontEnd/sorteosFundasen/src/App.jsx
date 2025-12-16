@@ -101,6 +101,7 @@ function App() {
   const [modalWinner, setModalWinner] = useState(null)
   const [drawParticipant, setDrawParticipant] = useState('')
   const [showDrawModal, setShowDrawModal] = useState(false)
+  const [showWinnerModal, setShowWinnerModal] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [showAllPeople, setShowAllPeople] = useState(false)
   const [showAllPrizes, setShowAllPrizes] = useState(false)
@@ -195,12 +196,13 @@ function App() {
       setLastWinner(payload)
       setModalWinner(payload)
       setDrawParticipant(payload.person.name)
-      setShowDrawModal(true)
+      setShowWinnerModal(true)
       playChime()
       settleToPrize(payload.prize)
     }
     const onDrawStart = () => {
       startSpin(stateRef.current?.upcomingPrizes)
+      setShowDrawModal(true)
     }
     eventSource.addEventListener('state', onState)
     eventSource.addEventListener('winner', onWinner)
@@ -246,6 +248,12 @@ function App() {
     } finally {
       setLoadingDraw(false)
     }
+  }
+
+  const openDrawModal = () => {
+    setShowDrawModal(true)
+    setModalWinner(null)
+    setDrawParticipant('')
   }
 
   const recentWinners = state?.recentWinners || []
@@ -303,9 +311,9 @@ function App() {
                   <div
                     key={prize.id}
                     className="wheel-segment"
-                    style={{ transform: `rotate(${angle}deg) translateY(-50%)` }}
+                    style={{ transform: `rotate(${angle}deg) translateY(-52%)`, '--angle': `${angle}deg` }}
                   >
-                    <span style={{ transform: `rotate(${-angle}deg)` }}>{prize.name}</span>
+                    <span style={{ transform: 'translate(-50%, 0) rotate(calc(-1 * var(--angle)))' }}>{prize.name}</span>
                   </div>
                 )
               })}
@@ -314,8 +322,8 @@ function App() {
               <div className="wheel-center">🎁</div>
             </div>
           </div>
-          <button className="cta" disabled={!token || loadingDraw} onClick={handleDraw}>
-            {loadingDraw ? 'Girando...' : 'Obsequio!'}
+          <button className="cta" disabled={!token} onClick={openDrawModal}>
+            Obsequio!
           </button>
           <p className="helper">Solo el anfitrión puede lanzar la ruleta.</p>
         </section>
@@ -394,11 +402,11 @@ function App() {
               </div>
               <button className="ghost small" type="button" onClick={() => setShowDrawModal(false)}>Cerrar</button>
             </div>
-            <div className="modal-wheel">
-              <div
-                className={`wheel wheel-large ${spinning ? 'spinning' : ''} ${isSettling ? 'settling' : ''}`}
-                style={{ background: wheelGradient, transform: `rotate(${rotation}deg)` }}
-                onTransitionEnd={handleWheelTransitionEnd}
+              <div className="modal-wheel">
+                <div
+                  className={`wheel wheel-large ${spinning ? 'spinning' : ''} ${isSettling ? 'settling' : ''}`}
+                  style={{ background: wheelGradient, transform: `rotate(${rotation}deg)` }}
+                  onTransitionEnd={handleWheelTransitionEnd}
               >
                 <div className="wheel-labels">
                   {displayPrizes.map((prize, idx) => {
@@ -408,9 +416,9 @@ function App() {
                       <div
                         key={prize.id}
                         className="wheel-segment"
-                        style={{ transform: `rotate(${angle}deg) translateY(-50%)` }}
+                        style={{ transform: `rotate(${angle}deg) translateY(-52%)`, '--angle': `${angle}deg` }}
                       >
-                        <span style={{ transform: `rotate(${-angle}deg)` }}>{prize.name}</span>
+                        <span style={{ transform: 'translate(-50%, 0) rotate(calc(-1 * var(--angle)))' }}>{prize.name}</span>
                       </div>
                     )
                   })}
@@ -418,9 +426,26 @@ function App() {
                 <div className="wheel-inner">
                   <div className="wheel-center">🎁</div>
                 </div>
+                </div>
               </div>
+            <div className="modal-actions">
+              <button className="cta" disabled={!token || loadingDraw} onClick={handleDraw}>
+                {loadingDraw ? 'Girando...' : 'Iniciar giro'}
+              </button>
+              <p className="helper">El giro se comparte en todas las pantallas y se detendrá automáticamente en el premio asignado.</p>
             </div>
-            <p className="helper">El giro se comparte en todas las pantallas y se detendrá automáticamente en el premio asignado.</p>
+          </div>
+        </div>
+      )}
+
+      {showWinnerModal && modalWinner && (
+        <div className="modal-backdrop">
+          <div className="modal-card winner-modal">
+            <p className="eyebrow">🎉 ¡Tenemos un ganador!</p>
+            <h2 className="winner-title">{modalWinner.person.name}</h2>
+            <p className="prize-highlight">{modalWinner.prize.name}</p>
+            <p className="helper">Felicidades al ganador. Prepara el siguiente obsequio cuando estés listo.</p>
+            <button className="cta" type="button" onClick={() => setShowWinnerModal(false)}>Cerrar anuncio</button>
           </div>
         </div>
       )}
