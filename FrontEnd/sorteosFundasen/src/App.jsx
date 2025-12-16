@@ -98,11 +98,16 @@ function App() {
   const [spinning, setSpinning] = useState(false)
   const [isSettling, setIsSettling] = useState(false)
   const [rotation, setRotation] = useState(0)
+  const [modalWinner, setModalWinner] = useState(null)
+  const [drawParticipant, setDrawParticipant] = useState('')
+  const [showDrawModal, setShowDrawModal] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [showAllPeople, setShowAllPeople] = useState(false)
   const [showAllPrizes, setShowAllPrizes] = useState(false)
   const playChime = useAudioChime()
   const wheelSnapshotRef = useRef([])
+  const wheelPrizesRef = useRef([])
+  const stateRef = useRef(null)
 
   const headers = useMemo(() => token ? { Authorization: `Bearer ${token}` } : {}, [token])
 
@@ -110,6 +115,14 @@ function App() {
     () => (state?.upcomingPrizes?.length ? state.upcomingPrizes : FALLBACK_PRIZES),
     [state?.upcomingPrizes]
   )
+
+  useEffect(() => {
+    wheelPrizesRef.current = wheelPrizes
+  }, [wheelPrizes])
+
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
 
   const displayPrizes = useMemo(() => {
     if (spinning || isSettling) {
@@ -129,21 +142,21 @@ function App() {
   }, [displayPrizes])
 
   const recordWheelSnapshot = useCallback((snapshot) => {
-    const source = snapshot && snapshot.length ? snapshot : wheelPrizes
+    const source = snapshot && snapshot.length ? snapshot : wheelPrizesRef.current
     wheelSnapshotRef.current = source
-  }, [wheelPrizes])
+  }, [])
 
   const startSpin = useCallback((snapshot) => {
-    const source = snapshot && snapshot.length ? snapshot : wheelPrizes
+    const source = snapshot && snapshot.length ? snapshot : wheelPrizesRef.current
     if (!source.length) return
     recordWheelSnapshot(source)
     setIsSettling(false)
     setSpinning(true)
     setRotation((prev) => prev + 720 + Math.random() * 180)
-  }, [recordWheelSnapshot, wheelPrizes])
+  }, [recordWheelSnapshot])
 
   const settleToPrize = useCallback((prize) => {
-    const prizes = wheelSnapshotRef.current.length ? wheelSnapshotRef.current : wheelPrizes
+    const prizes = wheelSnapshotRef.current.length ? wheelSnapshotRef.current : wheelPrizesRef.current
     if (!prizes.length || !prize) return
     const step = 360 / prizes.length
     const index = Math.max(prizes.findIndex((p) => p.id === prize.id), 0)
@@ -153,7 +166,7 @@ function App() {
       const base = prev % 360
       return base + 1080 + (360 - targetAngle)
     })
-  }, [wheelPrizes])
+  }, [])
 
   useEffect(() => {
     const loadState = async () => {
@@ -187,14 +200,14 @@ function App() {
       settleToPrize(payload.prize)
     }
     const onDrawStart = () => {
-      startSpin(state?.upcomingPrizes)
+      startSpin(stateRef.current?.upcomingPrizes)
     }
     eventSource.addEventListener('state', onState)
     eventSource.addEventListener('winner', onWinner)
     eventSource.addEventListener('draw-start', onDrawStart)
     eventSource.onerror = () => setError('La conexión en tiempo real tuvo un problema')
     return () => eventSource.close()
-  }, [playChime, settleToPrize, startSpin, state?.upcomingPrizes])
+  }, [playChime, settleToPrize, startSpin])
 
   const handleLogin = async (e) => {
     e.preventDefault()
