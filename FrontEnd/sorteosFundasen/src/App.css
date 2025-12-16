@@ -224,15 +224,17 @@ body {
 
 .wheel-segment span {
   position: absolute;
-  top: 6%;
+  top: 8%;
   left: 50%;
   transform: translate(-50%, 0);
-  width: 46%;
+  width: 56%;
   font-weight: 700;
   text-align: center;
   font-size: 13px;
   color: #0d1b2a;
   text-shadow: 0 1px 3px rgba(255,255,255,0.6);
+  letter-spacing: 0.2px;
+  line-height: 1.25;
 }
 
 .cta {
@@ -396,7 +398,7 @@ body {
 }
 
 .draw-modal {
-  width: min(860px, 94vw);
+  width: min(1020px, 96vw);
   text-align: left;
 }
 
@@ -410,7 +412,13 @@ body {
 .modal-wheel {
   display: grid;
   place-items: center;
-  margin: 18px 0 6px;
+  margin: 18px 0 12px;
+}
+
+.modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .ghost.small {
@@ -428,6 +436,24 @@ body {
   font-size: 18px;
   color: #ffeaaa;
   font-weight: 700;
+}
+
+.winner-modal {
+  width: min(620px, 92vw);
+  text-align: center;
+  background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.18), rgba(255,255,255,0.06));
+}
+
+.winner-title {
+  margin: 10px 0 6px;
+  font-size: 32px;
+}
+
+.prize-highlight {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: #ffeaaa;
 }
 
 .confetti-wrapper {
