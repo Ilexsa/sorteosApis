@@ -268,6 +268,12 @@ function App() {
     launchConfetti()
   }, [lastWinner])
 
+  useEffect(() => {
+    if (showWinnerModal && modalWinner) {
+      launchConfetti()
+    }
+  }, [modalWinner, showWinnerModal])
+
   const handleWheelTransitionEnd = () => {
     if (isSettling) {
       setSpinning(false)
@@ -321,6 +327,7 @@ function App() {
             <div className="wheel-inner">
               <div className="wheel-center">🎁</div>
             </div>
+            <div className="wheel-pointer" aria-hidden="true" />
           </div>
           <button className="cta" disabled={!token} onClick={openDrawModal}>
             Obsequio!
