@@ -258,15 +258,15 @@ body {
 
 .wheel-segment span {
   position: absolute;
-  top: 14%;
+  top: 8%;
   left: 50%;
   transform: translate(-50%, 0);
-  width: 62%;
-  font-weight: 800;
+  width: 56%;
+  font-weight: 700;
   text-align: center;
-  font-size: 14px;
-  color: #0f172a;
-  text-shadow: 0 1px 6px rgba(255,255,255,0.65);
+  font-size: 13px;
+  color: #0d1b2a;
+  text-shadow: 0 1px 3px rgba(255,255,255,0.6);
   letter-spacing: 0.2px;
   line-height: 1.25;
 }

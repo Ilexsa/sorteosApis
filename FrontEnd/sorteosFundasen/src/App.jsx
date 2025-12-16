@@ -197,7 +197,6 @@ function App() {
       setModalWinner(payload)
       setDrawParticipant(payload.person.name)
       setShowWinnerModal(true)
-      setShowDrawModal(false)
       playChime()
       settleToPrize(payload.prize)
     }
@@ -305,34 +304,28 @@ function App() {
 
       <main className="grid">
         <section className="panel wheel-card">
-          <div className="wheel-wrapper">
-            <div
-              className={`wheel ${spinning ? 'spinning' : ''} ${isSettling ? 'settling' : ''}`}
-              style={{ background: wheelGradient, transform: `rotate(${rotation}deg)` }}
-              onTransitionEnd={handleWheelTransitionEnd}
-            >
-              <div className="wheel-labels">
-                {displayPrizes.map((prize, idx) => {
-                  const step = 360 / displayPrizes.length
-                  const angle = idx * step
-                  return (
-                    <div
-                      key={prize.id}
-                      className="wheel-segment"
-                      style={{
-                        transform: `rotate(${angle}deg) translateY(-46%)`,
-                        '--angle': `${angle}deg`,
-                        '--step': `${step}deg`
-                      }}
-                    >
-                      <span style={{ transform: 'translate(-50%, 0) rotate(calc(-1 * var(--angle)))' }}>{prize.name}</span>
-                    </div>
-                  )
-                })}
-              </div>
-              <div className="wheel-inner">
-                <div className="wheel-center">🎁</div>
-              </div>
+          <div
+            className={`wheel ${spinning ? 'spinning' : ''} ${isSettling ? 'settling' : ''}`}
+            style={{ background: wheelGradient, transform: `rotate(${rotation}deg)` }}
+            onTransitionEnd={handleWheelTransitionEnd}
+          >
+            <div className="wheel-labels">
+              {displayPrizes.map((prize, idx) => {
+                const step = 360 / displayPrizes.length
+                const angle = idx * step
+                return (
+                  <div
+                    key={prize.id}
+                    className="wheel-segment"
+                    style={{ transform: `rotate(${angle}deg) translateY(-52%)`, '--angle': `${angle}deg` }}
+                  >
+                    <span style={{ transform: 'translate(-50%, 0) rotate(calc(-1 * var(--angle)))' }}>{prize.name}</span>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="wheel-inner">
+              <div className="wheel-center">🎁</div>
             </div>
             <div className="wheel-pointer" aria-hidden="true" />
           </div>
@@ -416,37 +409,30 @@ function App() {
               </div>
               <button className="ghost small" type="button" onClick={() => setShowDrawModal(false)}>Cerrar</button>
             </div>
-            <div className="modal-wheel">
-                <div className="wheel-wrapper">
-                  <div
-                    className={`wheel wheel-large ${spinning ? 'spinning' : ''} ${isSettling ? 'settling' : ''}`}
-                    style={{ background: wheelGradient, transform: `rotate(${rotation}deg)` }}
-                    onTransitionEnd={handleWheelTransitionEnd}
-                >
-                  <div className="wheel-labels">
-                    {displayPrizes.map((prize, idx) => {
-                      const step = 360 / displayPrizes.length
-                      const angle = idx * step
-                      return (
-                        <div
-                          key={prize.id}
-                          className="wheel-segment"
-                          style={{
-                            transform: `rotate(${angle}deg) translateY(-46%)`,
-                            '--angle': `${angle}deg`,
-                            '--step': `${step}deg`
-                          }}
-                        >
-                          <span style={{ transform: 'translate(-50%, 0) rotate(calc(-1 * var(--angle)))' }}>{prize.name}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                  <div className="wheel-inner">
-                    <div className="wheel-center">🎁</div>
-                  </div>
-                  </div>
-                  <div className="wheel-pointer" aria-hidden="true" />
+              <div className="modal-wheel">
+                <div
+                  className={`wheel wheel-large ${spinning ? 'spinning' : ''} ${isSettling ? 'settling' : ''}`}
+                  style={{ background: wheelGradient, transform: `rotate(${rotation}deg)` }}
+                  onTransitionEnd={handleWheelTransitionEnd}
+              >
+                <div className="wheel-labels">
+                  {displayPrizes.map((prize, idx) => {
+                    const step = 360 / displayPrizes.length
+                    const angle = idx * step
+                    return (
+                      <div
+                        key={prize.id}
+                        className="wheel-segment"
+                        style={{ transform: `rotate(${angle}deg) translateY(-52%)`, '--angle': `${angle}deg` }}
+                      >
+                        <span style={{ transform: 'translate(-50%, 0) rotate(calc(-1 * var(--angle)))' }}>{prize.name}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="wheel-inner">
+                  <div className="wheel-center">🎁</div>
+                </div>
                 </div>
               </div>
             <div className="modal-actions">
