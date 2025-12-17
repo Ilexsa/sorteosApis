@@ -200,10 +200,12 @@ function App() {
       const payload = JSON.parse(event.data || '{}')
       stateRef.current = { ...(stateRef.current || {}), lastDrawStart: payload }
       startSpin(stateRef.current?.upcomingPrizes)
-      setDrawParticipant(payload.person?.name || 'Seleccionando participante...')
+      if (payload.person) {
+        setDrawParticipant(payload.person.name)
+      }
       if (payload.prize) {
         setPendingPrize(payload.prize)
-        setTimeout(() => settleToPrize(payload.prize), 600)
+        settleToPrize(payload.prize)
       } else {
         setPendingPrize(null)
       }
@@ -241,13 +243,17 @@ function App() {
     setLoadingDraw(true)
     setError('')
     try {
-      if (!wheelPrizesRef.current.length) {
+      const prizes = wheelPrizesRef.current
+      if (!prizes.length) {
         throw new Error('No hay premios disponibles para girar')
       }
+      const targetPrize = prizes[Math.floor(Math.random() * prizes.length)]
+      setPendingPrize(targetPrize)
+      startSpin(prizes)
       const res = await fetch(`${API_BASE}/api/draw`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...headers },
-        body: JSON.stringify({ prizeId: 0 })
+        body: JSON.stringify({ prizeId: targetPrize.id })
       })
       const data = await res.json()
       if (!res.ok) {
@@ -313,19 +319,22 @@ function App() {
       <div className={`wheel-frame ${sizeClass}`}>
         <div
           className={`wheel-container ${spinning ? 'spinning' : ''} ${isSettling ? 'settling' : ''}`}
-          style={{ transform: `rotate(${rotation}deg)`, backgroundImage: gradientStops ? `conic-gradient(${gradientStops})` : 'none' }}
+          style={{ transform: `rotate(${rotation}deg)` }}
           onTransitionEnd={handleWheelTransitionEnd}
         >
           <div className="wheel-slices">
             {displayPrizes.map((prize, idx) => {
-              const angle = idx * step + step / 2
+              const angle = idx * step
               return (
                 <div
                   key={prize.id}
-                  className="slice-label"
-                  style={{ transform: `rotate(${angle}deg) translateY(-46%) rotate(${-angle}deg)` }}
+                  className="slice"
+                  style={{
+                    transform: `translateX(-50%) rotate(${angle}deg)`,
+                    backgroundColor: SEGMENT_COLORS[idx % SEGMENT_COLORS.length]
+                  }}
                 >
-                  <span>{prize.name}</span>
+                  <span style={{ transform: `rotate(${-angle}deg)` }}>{prize.name}</span>
                 </div>
               )
             })}
