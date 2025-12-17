@@ -144,7 +144,7 @@ function App() {
     recordWheelSnapshot(source)
     setIsSettling(false)
     setSpinning(true)
-    setRotation((prev) => prev + 720 + Math.random() * 180)
+    setRotation((prev) => prev + 720 + Math.random() * 360)
   }, [recordWheelSnapshot])
 
   const settleToPrize = useCallback((prize) => {
@@ -152,11 +152,13 @@ function App() {
     if (!prizes.length || !prize) return
     const step = 360 / prizes.length
     const index = Math.max(prizes.findIndex((p) => p.id === prize.id), 0)
-    const targetAngle = index * step
+    const targetAngle = index * step + step / 2
     setIsSettling(true)
     setRotation((prev) => {
-      const base = prev % 360
-      return base + 1080 + (360 - targetAngle)
+      const normalized = ((prev % 360) + 360) % 360
+      const delta = 360 - targetAngle - normalized
+      const extraTurns = 1440
+      return prev + extraTurns + delta
     })
   }, [])
 
@@ -308,6 +310,11 @@ function App() {
 
   const renderWheel = (sizeClass = '') => {
     const step = displayPrizes.length ? 360 / displayPrizes.length : 0
+    const gradientStops = displayPrizes.map((_, idx) => {
+      const start = idx * step
+      const end = (idx + 1) * step
+      return `${SEGMENT_COLORS[idx % SEGMENT_COLORS.length]} ${start}deg ${end}deg`
+    }).join(', ')
     return (
       <div className={`wheel-frame ${sizeClass}`}>
         <div

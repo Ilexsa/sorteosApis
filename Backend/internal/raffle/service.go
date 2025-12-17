@@ -98,6 +98,8 @@ func (s *Service) Draw(ctx context.Context, prizeID int) (models.WinnerRecord, e
 		return models.WinnerRecord{}, err
 	}
 
+	time.Sleep(1500 * time.Millisecond)
+
 	s.broadcast(Event{Type: "winner", Data: record})
 	if state, err := s.State(ctx); err == nil {
 		s.broadcast(Event{Type: "state", Data: state})
