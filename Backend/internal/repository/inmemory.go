@@ -58,7 +58,7 @@ func (r *InMemoryRepository) Snapshot(_ context.Context) ([]models.Person, []mod
 	return people, prizes, winners, nil
 }
 
-func (r *InMemoryRepository) DrawRandom(_ context.Context) (models.WinnerRecord, error) {
+func (r *InMemoryRepository) Draw(_ context.Context, prizeID int) (models.WinnerRecord, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -70,7 +70,20 @@ func (r *InMemoryRepository) DrawRandom(_ context.Context) (models.WinnerRecord,
 	}
 
 	personIdx := rand.Intn(len(r.people))
-	prizeIdx := rand.Intn(len(r.prizes))
+	prizeIdx := -1
+	if prizeID > 0 {
+		for i, prize := range r.prizes {
+			if prize.ID == prizeID {
+				prizeIdx = i
+				break
+			}
+		}
+		if prizeIdx == -1 {
+			return models.WinnerRecord{}, ErrPrizeUnavailable
+		}
+	} else {
+		prizeIdx = rand.Intn(len(r.prizes))
+	}
 
 	person := r.people[personIdx]
 	r.people = append(r.people[:personIdx], r.people[personIdx+1:]...)
