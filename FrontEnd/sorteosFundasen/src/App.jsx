@@ -112,6 +112,10 @@ function App() {
 
   const headers = useMemo(() => token ? { Authorization: `Bearer ${token}` } : {}, [token])
 
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
+
   const wheelPrizes = useMemo(
     () => (state?.upcomingPrizes?.length ? state.upcomingPrizes : FALLBACK_PRIZES),
     [state?.upcomingPrizes]
@@ -120,10 +124,6 @@ function App() {
   useEffect(() => {
     wheelPrizesRef.current = wheelPrizes
   }, [wheelPrizes])
-
-  useEffect(() => {
-    stateRef.current = state
-  }, [state])
 
   const displayPrizes = useMemo(() => {
     if (spinning || isSettling) {
@@ -189,6 +189,7 @@ function App() {
     const eventSource = new EventSource(`${API_BASE}/events`)
     const onState = (event) => {
       const payload = JSON.parse(event.data)
+      stateRef.current = payload
       setState(payload)
     }
     const onWinner = (event) => {
@@ -507,6 +508,7 @@ function App() {
                   <div className="pointer-cap" />
                 </div>
                 </div>
+                <div className="wheel-pin" aria-hidden="true" />
               </div>
             <div className="modal-actions">
               <button className="cta" disabled={!token || loadingDraw} onClick={handleDraw}>
