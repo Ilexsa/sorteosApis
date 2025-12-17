@@ -287,31 +287,40 @@ function App() {
   const renderWheel = (sizeClass = '') => {
     const step = displayPrizes.length ? 360 / displayPrizes.length : 0
     return (
-      <div
-        className={`wheel ${sizeClass} ${spinning ? 'spinning' : ''} ${isSettling ? 'settling' : ''}`}
-        style={{ transform: `rotate(${rotation}deg)` }}
-        onTransitionEnd={handleWheelTransitionEnd}
-      >
-        <div className="wheel-slices">
-          {displayPrizes.map((prize, idx) => {
-            const angle = idx * step
-            return (
-              <div
-                key={prize.id}
-                className="wheel-slice"
-                style={{
-                  transform: `translateX(-50%) rotate(${angle}deg)`,
-                  backgroundColor: SEGMENT_COLORS[idx % SEGMENT_COLORS.length]
-                }}
-              >
-                <span style={{ transform: `rotate(${-angle}deg)` }}>{prize.name}</span>
-              </div>
-            )
-          })}
+      <div className={`wheel-frame ${sizeClass}`}>
+        <div
+          className={`wheel-container ${spinning ? 'spinning' : ''} ${isSettling ? 'settling' : ''}`}
+          style={{ transform: `rotate(${rotation}deg)` }}
+          onTransitionEnd={handleWheelTransitionEnd}
+        >
+          <div className="wheel-slices">
+            {displayPrizes.map((prize, idx) => {
+              const angle = idx * step
+              return (
+                <div
+                  key={prize.id}
+                  className="slice"
+                  style={{
+                    transform: `translateX(-50%) rotate(${angle}deg)`,
+                    backgroundColor: SEGMENT_COLORS[idx % SEGMENT_COLORS.length]
+                  }}
+                >
+                  <span style={{ transform: `rotate(${-angle}deg)` }}>{prize.name}</span>
+                </div>
+              )
+            })}
+          </div>
+          <button
+            type="button"
+            className="wheel-center-button"
+            disabled={!token}
+            onClick={openDrawModal}
+            aria-label="Abrir sorteo"
+          >
+            Spin
+          </button>
         </div>
-        <div className="wheel-inner">
-          <div className="wheel-center">🎁</div>
-        </div>
+        <div className="wheel-arrow" aria-hidden="true" />
       </div>
     )
   }
@@ -339,11 +348,6 @@ function App() {
         <section className="panel wheel-card">
           <div className="wheel-wrapper">
             {renderWheel()}
-            <div className="wheel-pointer" aria-hidden="true">
-              <div className="pointer-cap" />
-            </div>
-            <div className="wheel-pin" aria-hidden="true" />
-            <div className="wheel-pointer" aria-hidden="true" />
           </div>
           <button className="cta" disabled={!token} onClick={openDrawModal}>
             Obsequio!
@@ -428,11 +432,6 @@ function App() {
             <div className="modal-wheel">
               <div className="wheel-wrapper">
                 {renderWheel('wheel-large')}
-                <div className="wheel-pointer" aria-hidden="true">
-                  <div className="pointer-cap" />
-                </div>
-                <div className="wheel-pin" aria-hidden="true" />
-                <div className="wheel-pointer" aria-hidden="true" />
               </div>
             </div>
             <div className="modal-actions">
