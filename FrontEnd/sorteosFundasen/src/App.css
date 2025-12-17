@@ -212,10 +212,6 @@ body {
   backdrop-filter: blur(2px);
   border: 1px solid rgba(255,255,255,0.18);
   max-width: 160px;
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  letter-spacing: 1px;
-  line-height: 1.2;
 }
 
 .wheel-center-button {
