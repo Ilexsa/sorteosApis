@@ -47,10 +47,15 @@ func (h *APIHandler) GetState(c *gin.Context) {
 }
 
 func (h *APIHandler) RunDraw(c *gin.Context) {
-	record, err := h.service.Draw(c.Request.Context())
+	var payload struct {
+		PrizeID int `json:"prizeId"`
+	}
+	_ = c.ShouldBindJSON(&payload)
+
+	record, err := h.service.Draw(c.Request.Context(), payload.PrizeID)
 	if err != nil {
 		status := http.StatusInternalServerError
-		if err == repository.ErrNoParticipants || err == repository.ErrNoPrizes {
+		if err == repository.ErrNoParticipants || err == repository.ErrNoPrizes || err == repository.ErrPrizeUnavailable {
 			status = http.StatusConflict
 		}
 		c.JSON(status, gin.H{"error": err.Error()})

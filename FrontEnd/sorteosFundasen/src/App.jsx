@@ -99,6 +99,7 @@ function App() {
   const [isSettling, setIsSettling] = useState(false)
   const [rotation, setRotation] = useState(0)
   const [modalWinner, setModalWinner] = useState(null)
+  const [pendingPrize, setPendingPrize] = useState(null)
   const [drawParticipant, setDrawParticipant] = useState('')
   const [showDrawModal, setShowDrawModal] = useState(false)
   const [showWinnerModal, setShowWinnerModal] = useState(false)
@@ -186,15 +187,26 @@ function App() {
       const payload = JSON.parse(event.data)
       setLastWinner(payload)
       setModalWinner(payload)
+      setPendingPrize(payload.prize || null)
       setDrawParticipant(payload.person.name)
       setShowWinnerModal(true)
+      setShowDrawModal(false)
       playChime()
       settleToPrize(payload.prize)
     }
-    const onDrawStart = () => {
+    const onDrawStart = (event) => {
+      const payload = JSON.parse(event.data || '{}')
+      stateRef.current = { ...(stateRef.current || {}), lastDrawStart: payload }
       startSpin(stateRef.current?.upcomingPrizes)
+      setDrawParticipant(payload.person?.name || 'Seleccionando participante...')
+      if (payload.prize) {
+        setPendingPrize(payload.prize)
+        setTimeout(() => settleToPrize(payload.prize), 600)
+      } else {
+        setPendingPrize(null)
+      }
       setModalWinner(null)
-      setDrawParticipant('')
+      setShowWinnerModal(false)
       setShowDrawModal(true)
     }
     eventSource.addEventListener('state', onState)
@@ -227,10 +239,13 @@ function App() {
     setLoadingDraw(true)
     setError('')
     try {
-      startSpin(state?.upcomingPrizes)
+      if (!wheelPrizesRef.current.length) {
+        throw new Error('No hay premios disponibles para girar')
+      }
       const res = await fetch(`${API_BASE}/api/draw`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...headers }
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ prizeId: 0 })
       })
       const data = await res.json()
       if (!res.ok) {
@@ -246,6 +261,7 @@ function App() {
   const openDrawModal = () => {
     setShowDrawModal(true)
     setModalWinner(null)
+    setPendingPrize(null)
     setDrawParticipant('')
   }
 
@@ -287,31 +303,41 @@ function App() {
   const renderWheel = (sizeClass = '') => {
     const step = displayPrizes.length ? 360 / displayPrizes.length : 0
     return (
-      <div
-        className={`wheel ${sizeClass} ${spinning ? 'spinning' : ''} ${isSettling ? 'settling' : ''}`}
-        style={{ transform: `rotate(${rotation}deg)` }}
-        onTransitionEnd={handleWheelTransitionEnd}
-      >
-        <div className="wheel-slices">
-          {displayPrizes.map((prize, idx) => {
-            const angle = idx * step
-            return (
-              <div
-                key={prize.id}
-                className="wheel-slice"
-                style={{
-                  transform: `translateX(-50%) rotate(${angle}deg)`,
-                  backgroundColor: SEGMENT_COLORS[idx % SEGMENT_COLORS.length]
-                }}
-              >
-                <span style={{ transform: `rotate(${-angle}deg)` }}>{prize.name}</span>
-              </div>
-            )
-          })}
+      <div className={`wheel-frame ${sizeClass}`}>
+        <div
+          className={`wheel-container ${spinning ? 'spinning' : ''} ${isSettling ? 'settling' : ''}`}
+          style={{ transform: `rotate(${rotation}deg)` }}
+          onTransitionEnd={handleWheelTransitionEnd}
+        >
+          <div className="wheel-slices">
+            {displayPrizes.map((prize, idx) => {
+              const angle = idx * step
+              return (
+                <div
+                  key={prize.id}
+                  className="slice"
+                  style={{
+                    '--slice-angle': `${angle}deg`,
+                    transform: `translateX(-50%) rotate(${angle}deg)`,
+                    backgroundColor: SEGMENT_COLORS[idx % SEGMENT_COLORS.length]
+                  }}
+                >
+                  <span>{prize.name}</span>
+                </div>
+              )
+            })}
+          </div>
+          <button
+            type="button"
+            className="wheel-center-button"
+            disabled={!token}
+            onClick={openDrawModal}
+            aria-label="Abrir sorteo"
+          >
+            Spin
+          </button>
         </div>
-        <div className="wheel-inner">
-          <div className="wheel-center">🎁</div>
-        </div>
+        <div className="wheel-arrow" aria-hidden="true" />
       </div>
     )
   }
@@ -339,11 +365,6 @@ function App() {
         <section className="panel wheel-card">
           <div className="wheel-wrapper">
             {renderWheel()}
-            <div className="wheel-pointer" aria-hidden="true">
-              <div className="pointer-cap" />
-            </div>
-            <div className="wheel-pin" aria-hidden="true" />
-            <div className="wheel-pointer" aria-hidden="true" />
           </div>
           <button className="cta" disabled={!token} onClick={openDrawModal}>
             Obsequio!
@@ -417,22 +438,19 @@ function App() {
       {showDrawModal && (
         <div className="modal-backdrop">
           <div className="modal-card draw-modal">
-            <div className="modal-heading">
-              <div>
-                <p className="muted">Participante que recibirá el premio</p>
-                <h3 className="winner-name">{drawParticipant || 'Seleccionando participante...'}</h3>
-                <p className="prize-name">{modalWinner ? `Premio: ${modalWinner.prize.name}` : 'Ruleta cargada con los premios disponibles'}</p>
+              <div className="modal-heading">
+                <div>
+                  <p className="muted">Participante que recibirá el premio</p>
+                  <h3 className="winner-name">{drawParticipant || 'Seleccionando participante...'}</h3>
+                  <p className="prize-name">
+                    {modalWinner ? `Premio: ${modalWinner.prize.name}` : pendingPrize ? `Premio en juego: ${pendingPrize.name}` : 'Ruleta cargada con los premios disponibles'}
+                  </p>
+                </div>
+                <button className="ghost small" type="button" onClick={() => setShowDrawModal(false)}>Cerrar</button>
               </div>
-              <button className="ghost small" type="button" onClick={() => setShowDrawModal(false)}>Cerrar</button>
-            </div>
             <div className="modal-wheel">
               <div className="wheel-wrapper">
                 {renderWheel('wheel-large')}
-                <div className="wheel-pointer" aria-hidden="true">
-                  <div className="pointer-cap" />
-                </div>
-                <div className="wheel-pin" aria-hidden="true" />
-                <div className="wheel-pointer" aria-hidden="true" />
               </div>
             </div>
             <div className="modal-actions">
