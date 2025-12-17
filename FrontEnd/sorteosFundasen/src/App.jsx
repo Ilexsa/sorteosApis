@@ -99,6 +99,7 @@ function App() {
   const [isSettling, setIsSettling] = useState(false)
   const [rotation, setRotation] = useState(0)
   const [modalWinner, setModalWinner] = useState(null)
+  const [pendingPrize, setPendingPrize] = useState(null)
   const [drawParticipant, setDrawParticipant] = useState('')
   const [showDrawModal, setShowDrawModal] = useState(false)
   const [showWinnerModal, setShowWinnerModal] = useState(false)
@@ -186,15 +187,28 @@ function App() {
       const payload = JSON.parse(event.data)
       setLastWinner(payload)
       setModalWinner(payload)
+      setPendingPrize(payload.prize || null)
       setDrawParticipant(payload.person.name)
       setShowWinnerModal(true)
+      setShowDrawModal(false)
       playChime()
       settleToPrize(payload.prize)
     }
-    const onDrawStart = () => {
+    const onDrawStart = (event) => {
+      const payload = JSON.parse(event.data || '{}')
+      stateRef.current = { ...(stateRef.current || {}), lastDrawStart: payload }
       startSpin(stateRef.current?.upcomingPrizes)
+      if (payload.person) {
+        setDrawParticipant(payload.person.name)
+      }
+      if (payload.prize) {
+        setPendingPrize(payload.prize)
+        settleToPrize(payload.prize)
+      } else {
+        setPendingPrize(null)
+      }
       setModalWinner(null)
-      setDrawParticipant('')
+      setShowWinnerModal(false)
       setShowDrawModal(true)
     }
     eventSource.addEventListener('state', onState)
@@ -227,10 +241,17 @@ function App() {
     setLoadingDraw(true)
     setError('')
     try {
-      startSpin(state?.upcomingPrizes)
+      const prizes = wheelPrizesRef.current
+      if (!prizes.length) {
+        throw new Error('No hay premios disponibles para girar')
+      }
+      const targetPrize = prizes[Math.floor(Math.random() * prizes.length)]
+      setPendingPrize(targetPrize)
+      startSpin(prizes)
       const res = await fetch(`${API_BASE}/api/draw`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...headers }
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ prizeId: targetPrize.id })
       })
       const data = await res.json()
       if (!res.ok) {
@@ -246,6 +267,7 @@ function App() {
   const openDrawModal = () => {
     setShowDrawModal(true)
     setModalWinner(null)
+    setPendingPrize(null)
     setDrawParticipant('')
   }
 
@@ -421,14 +443,16 @@ function App() {
       {showDrawModal && (
         <div className="modal-backdrop">
           <div className="modal-card draw-modal">
-            <div className="modal-heading">
-              <div>
-                <p className="muted">Participante que recibirá el premio</p>
-                <h3 className="winner-name">{drawParticipant || 'Seleccionando participante...'}</h3>
-                <p className="prize-name">{modalWinner ? `Premio: ${modalWinner.prize.name}` : 'Ruleta cargada con los premios disponibles'}</p>
+              <div className="modal-heading">
+                <div>
+                  <p className="muted">Participante que recibirá el premio</p>
+                  <h3 className="winner-name">{drawParticipant || 'Seleccionando participante...'}</h3>
+                  <p className="prize-name">
+                    {modalWinner ? `Premio: ${modalWinner.prize.name}` : pendingPrize ? `Premio en juego: ${pendingPrize.name}` : 'Ruleta cargada con los premios disponibles'}
+                  </p>
+                </div>
+                <button className="ghost small" type="button" onClick={() => setShowDrawModal(false)}>Cerrar</button>
               </div>
-              <button className="ghost small" type="button" onClick={() => setShowDrawModal(false)}>Cerrar</button>
-            </div>
             <div className="modal-wheel">
               <div className="wheel-wrapper">
                 {renderWheel('wheel-large')}
