@@ -324,15 +324,14 @@ function App() {
               <div className="wheel-labels">
                 {displayPrizes.map((prize, idx) => {
                   const step = 360 / displayPrizes.length
-                  const angle = idx * step
+                  const angle = idx * step + step / 2
                   return (
                     <div
                       key={prize.id}
                       className="wheel-segment"
                       style={{
                         transform: `rotate(${angle}deg) translateY(-46%)`,
-                        '--angle': `${angle}deg`,
-                        '--step': `${step}deg`
+                        '--angle': `${angle}deg`
                       }}
                     >
                       <span style={{ transform: 'translate(-50%, 0) rotate(calc(-1 * var(--angle)))' }}>{prize.name}</span>
