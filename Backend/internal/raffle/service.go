@@ -87,14 +87,18 @@ func (s *Service) State(ctx context.Context) (models.RaffleState, error) {
 	}, nil
 }
 
-func (s *Service) Draw(ctx context.Context) (models.WinnerRecord, error) {
+func (s *Service) Draw(ctx context.Context, prizeID int) (models.WinnerRecord, error) {
 	s.drawMu.Lock()
-	s.broadcast(Event{Type: "draw-start", Data: map[string]interface{}{"startedAt": time.Now().UTC()}})
-	record, err := s.repo.DrawRandom(ctx)
+	record, err := s.repo.Draw(ctx, prizeID)
+	if err == nil {
+		s.broadcast(Event{Type: "draw-start", Data: map[string]interface{}{"startedAt": time.Now().UTC(), "person": record.Person, "prize": record.Prize}})
+	}
 	s.drawMu.Unlock()
 	if err != nil {
 		return models.WinnerRecord{}, err
 	}
+
+	time.Sleep(1500 * time.Millisecond)
 
 	s.broadcast(Event{Type: "winner", Data: record})
 	if state, err := s.State(ctx); err == nil {

@@ -36,7 +36,7 @@ func (r *SQLServerRepository) Snapshot(ctx context.Context) ([]models.Person, []
 	return people, prizes, winners, nil
 }
 
-func (r *SQLServerRepository) DrawRandom(ctx context.Context) (models.WinnerRecord, error) {
+func (r *SQLServerRepository) Draw(ctx context.Context, prizeID int) (models.WinnerRecord, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return models.WinnerRecord{}, err
@@ -47,7 +47,15 @@ func (r *SQLServerRepository) DrawRandom(ctx context.Context) (models.WinnerReco
 	if err != nil {
 		return models.WinnerRecord{}, err
 	}
-	prize, err := r.pickRandomPrize(ctx, tx)
+	var prize models.Prize
+	if prizeID > 0 {
+		prize, err = r.pickPrizeByID(ctx, tx, prizeID)
+		if err != nil {
+			return models.WinnerRecord{}, err
+		}
+	} else {
+		prize, err = r.pickRandomPrize(ctx, tx)
+	}
 	if err != nil {
 		return models.WinnerRecord{}, err
 	}
@@ -154,6 +162,21 @@ ORDER BY NEWID()`)
 	if err := row.Scan(&p.ID, &p.Name, &p.Description); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return models.Prize{}, ErrNoPrizes
+		}
+		return models.Prize{}, err
+	}
+	return p, nil
+}
+
+func (r *SQLServerRepository) pickPrizeByID(ctx context.Context, tx *sql.Tx, prizeID int) (models.Prize, error) {
+	row := tx.QueryRowContext(ctx, `SELECT pr.id, pr.nombre, pr.descripcion
+FROM premios pr
+WHERE pr.id = @p1 AND NOT EXISTS (SELECT 1 FROM ganadores g WHERE g.premio_id = pr.id)`, prizeID)
+
+	var p models.Prize
+	if err := row.Scan(&p.ID, &p.Name, &p.Description); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.Prize{}, ErrPrizeUnavailable
 		}
 		return models.Prize{}, err
 	}
