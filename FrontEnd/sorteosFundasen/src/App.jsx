@@ -503,8 +503,8 @@ function App() {
                     )
                   })}
                 </div>
-                <div className="wheel-inner">
-                  <div className="wheel-center">🎁</div>
+                <div className="wheel-pointer" aria-hidden="true">
+                  <div className="pointer-cap" />
                 </div>
                 </div>
               </div>

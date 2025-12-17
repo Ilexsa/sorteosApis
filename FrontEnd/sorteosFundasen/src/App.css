@@ -183,7 +183,13 @@ body {
   z-index: 1;
 }
 
-.wheel::after {
+.wheel-large {
+  width: min(480px, 82vw);
+  height: min(480px, 82vw);
+  border-width: 16px;
+}
+
+.wheel::before {
   content: '';
   position: absolute;
   inset: 8px;
