@@ -334,7 +334,7 @@ body {
 
 .wheel-container.wheel-packed {
   border-width: 10px;
-  }
+}
 
 .wheel-container.wheel-packed .slice span {
   max-width: 96px;
