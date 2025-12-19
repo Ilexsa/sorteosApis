@@ -4,7 +4,6 @@ import './App.css'
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://10.1.0.6:8080'
 const TWEENMAX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/gsap/1.20.4/TweenMax.min.js'
 const WINWHEEL_URL = 'https://cdn.jsdelivr.net/npm/winwheel@2.9.0/Winwheel.min.js'
-const COLLAPSE_COUNT = 14
 
 const EMPTY_STATE = {
   remainingPeople: 0,
@@ -97,8 +96,6 @@ function App() {
   const [showWheelModal, setShowWheelModal] = useState(false)
   const [selectedParticipantId, setSelectedParticipantId] = useState(null)
   const [wheelReady, setWheelReady] = useState(false)
-  const [showAllParticipants, setShowAllParticipants] = useState(false)
-  const [showAllPrizes, setShowAllPrizes] = useState(false)
 
   const stateRef = useRef(EMPTY_STATE)
   const pendingSpinRef = useRef(null)
@@ -141,19 +138,7 @@ function App() {
     if (!available.some((person) => person.id === selectedParticipantId)) {
       setSelectedParticipantId(available[0].id)
     }
-  }, [waitingPeople, selectedParticipantId])
-
-  useEffect(() => {
-    if (waitingPeople.length <= 14 && showAllParticipants) {
-      setShowAllParticipants(false)
-    }
-  }, [waitingPeople, showAllParticipants])
-
-  useEffect(() => {
-    if (upcomingPrizes.length <= 14 && showAllPrizes) {
-      setShowAllPrizes(false)
-    }
-  }, [upcomingPrizes, showAllPrizes])
+  }, [raffleState.waitingPeople, selectedParticipantId])
 
   useEffect(() => {
     if (winwheelReady.current) {
@@ -240,7 +225,6 @@ function App() {
 
   const loadWinwheel = useCallback(async () => {
     try {
-      if (typeof window === 'undefined' || typeof document === 'undefined') return
       await ensureScript(TWEENMAX_URL)
       await ensureScript(WINWHEEL_URL)
       winwheelReady.current = true
@@ -416,6 +400,10 @@ function App() {
       setLoadingSpin(false)
     }
   }
+
+  const remainingPeople = raffleState.waitingPeople?.length || 0
+  const remainingPrizes = raffleState.upcomingPrizes?.length || 0
+  const selectedParticipant = raffleState.waitingPeople?.find((p) => p.id === selectedParticipantId)
 
   const closeWinner = () => {
     setWinner(null)
