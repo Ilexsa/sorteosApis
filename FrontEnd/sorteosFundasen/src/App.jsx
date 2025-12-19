@@ -103,7 +103,6 @@ function App() {
   const [drawParticipant, setDrawParticipant] = useState('')
   const [showDrawModal, setShowDrawModal] = useState(false)
   const [showWinnerModal, setShowWinnerModal] = useState(false)
-  const [showModal, setShowModal] = useState(false)
   const [showAllPeople, setShowAllPeople] = useState(false)
   const [showAllPrizes, setShowAllPrizes] = useState(false)
   const playChime = useAudioChime()
@@ -193,19 +192,20 @@ function App() {
       setDrawParticipant(payload.person.name)
       setShowWinnerModal(true)
       setShowDrawModal(false)
+      setLoadingDraw(false)
       playChime()
       settleToPrize(payload.prize)
     }
     const onDrawStart = (event) => {
       const payload = JSON.parse(event.data || '{}')
-      stateRef.current = { ...(stateRef.current || {}), lastDrawStart: payload }
-      startSpin(stateRef.current?.upcomingPrizes)
+      const snapshot = (stateRef.current?.upcomingPrizes || []).slice()
+      recordWheelSnapshot(snapshot)
+      startSpin(snapshot)
       if (payload.person) {
         setDrawParticipant(payload.person.name)
       }
       if (payload.prize) {
         setPendingPrize(payload.prize)
-        settleToPrize(payload.prize)
       } else {
         setPendingPrize(null)
       }
@@ -218,7 +218,7 @@ function App() {
     eventSource.addEventListener('draw-start', onDrawStart)
     eventSource.onerror = () => setError('La conexión en tiempo real tuvo un problema')
     return () => eventSource.close()
-  }, [playChime, settleToPrize, startSpin])
+  }, [playChime, recordWheelSnapshot, settleToPrize, startSpin])
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -243,17 +243,10 @@ function App() {
     setLoadingDraw(true)
     setError('')
     try {
-      const prizes = wheelPrizesRef.current
-      if (!prizes.length) {
-        throw new Error('No hay premios disponibles para girar')
-      }
-      const targetPrize = prizes[Math.floor(Math.random() * prizes.length)]
-      setPendingPrize(targetPrize)
-      startSpin(prizes)
       const res = await fetch(`${API_BASE}/api/draw`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...headers },
-        body: JSON.stringify({ prizeId: targetPrize.id })
+        body: JSON.stringify({ prizeId: pendingPrize?.id || 0 })
       })
       const data = await res.json()
       if (!res.ok) {
