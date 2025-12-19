@@ -46,16 +46,17 @@ func (h *APIHandler) GetState(c *gin.Context) {
 	c.JSON(http.StatusOK, state)
 }
 
-func (h *APIHandler) RunDraw(c *gin.Context) {
+func (h *APIHandler) RegisterSpin(c *gin.Context) {
 	var payload struct {
-		PrizeID int `json:"prizeId"`
+		ParticipantID int `json:"participantId"`
+		PrizeID       int `json:"prizeId"`
 	}
 	_ = c.ShouldBindJSON(&payload)
 
-	record, err := h.service.Draw(c.Request.Context(), payload.PrizeID)
+	record, err := h.service.RegisterSpin(c.Request.Context(), payload.ParticipantID, payload.PrizeID)
 	if err != nil {
 		status := http.StatusInternalServerError
-		if err == repository.ErrNoParticipants || err == repository.ErrNoPrizes || err == repository.ErrPrizeUnavailable {
+		if err == repository.ErrNoParticipants || err == repository.ErrNoPrizes || err == repository.ErrPrizeUnavailable || err == repository.ErrParticipantUsed || err == repository.ErrNothingToRegister {
 			status = http.StatusConflict
 		}
 		c.JSON(status, gin.H{"error": err.Error()})
