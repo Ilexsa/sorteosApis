@@ -271,46 +271,20 @@ body {
 
 .wheel-container {
   position: relative;
+  display: grid;
+  place-items: center;
   width: clamp(280px, 52vw, 560px);
   aspect-ratio: 1;
   border-radius: 50%;
   overflow: hidden;
   border: 16px solid rgba(226, 232, 240, 0.7);
   background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.12), rgba(15, 23, 42, 0.9));
-  transition: transform 5.5s cubic-bezier(0.12, 0.68, 0.22, 1);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), inset 0 0 0 6px rgba(255, 255, 255, 0.12);
 }
 
 .wheel-canvas {
   width: 100%;
   height: 100%;
-}
-
-.wheel-container.spinning {
-  filter: drop-shadow(0 16px 40px rgba(0, 0, 0, 0.45));
-}
-
-.wheel-container.wheel-packed {
-  border-width: 10px;
-}
-
-.wheel-container.wheel-roomy .slice span {
-  max-width: 160px;
-}
-
-.wheel-container.wheel-dense .slice span {
-  max-width: 120px;
-  padding: 10px 8px;
-}
-
-.wheel-container.wheel-packed {
-  border-width: 10px;
-}
-
-.wheel-container.wheel-packed .slice span {
-  max-width: 96px;
-  padding: 8px 6px;
-  letter-spacing: 0.5px;
 }
 
 .wheel-center {
@@ -328,17 +302,6 @@ body {
   text-align: center;
   color: #0f172a;
   padding: 10px;
-}
-
-.wheel-container.wheel-dense .wheel-center {
-  width: 150px;
-  height: 150px;
-}
-
-.wheel-container.wheel-packed .wheel-center {
-  width: 130px;
-  height: 130px;
-  font-size: 14px;
 }
 
 .wheel-arrow {
@@ -503,9 +466,15 @@ body {
   font-size: 18px;
 }
 
-.wheel-container.giant .slice span {
-  max-width: 220px;
-  font-size: 15px;
+.wheel-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.5);
+  color: #e2e8f0;
+  font-weight: 700;
+  backdrop-filter: blur(2px);
 }
 
 .winner-inline {

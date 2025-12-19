@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://10.1.0.6:8080'
+const TWEENMAX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/gsap/1.20.4/TweenMax.min.js'
+const WINWHEEL_URL = 'https://cdn.jsdelivr.net/npm/winwheel@2.9.0/Winwheel.min.js'
 
 const EMPTY_STATE = {
   remainingPeople: 0,
@@ -93,11 +95,15 @@ function App() {
   const [connectionLost, setConnectionLost] = useState(false)
   const [showWheelModal, setShowWheelModal] = useState(false)
   const [selectedParticipantId, setSelectedParticipantId] = useState(null)
+  const [wheelReady, setWheelReady] = useState(false)
 
   const stateRef = useRef(EMPTY_STATE)
   const pendingSpinRef = useRef(null)
   const eventSourceRef = useRef(null)
   const reconnectTimer = useRef(null)
+  const canvasIdRef = useRef('fundasen-wheel-canvas')
+  const winwheelRef = useRef(null)
+  const winwheelReady = useRef(false)
 
   const headers = useMemo(() => (token ? { Authorization: `Bearer ${token}` } : {}), [token])
 
@@ -123,52 +129,100 @@ function App() {
     }
   }, [raffleState.waitingPeople, selectedParticipantId])
 
-  const computeTargetRotation = useCallback((segments, target) => {
-    if (!segments.length) return rotationRef.current
-    const step = 360 / segments.length
-    const idx = Math.max(
-      segments.findIndex((item) => item.id === target?.id),
-      0
-    )
-    const center = idx * step + step / 2
-    const baseTurns = 6 * 360
-    const wobble = step * 0.15
-    const stopAngle = baseTurns + (360 - center) + (Math.random() * wobble - wobble / 2)
-    return rotationRef.current + stopAngle
-  }, [])
+  useEffect(() => {
+    if (winwheelReady.current) {
+      rebuildWheel(wheelSegments)
+    }
+  }, [rebuildWheel, wheelSegments])
 
-  const rebuildWheel = useCallback(
-    (segments) => {
-      if (!winwheelReady.current || !window.Winwheel) return
-      const mapped = (segments.length ? segments : FALLBACK_PRIZES).map((prize, idx) => ({
-        fillStyle: SEGMENT_COLORS[idx % SEGMENT_COLORS.length],
-        text: prize.name,
-        prizeId: prize.id
-      }))
+  useEffect(() => {
+    if (winwheelReady.current && spinning && pendingSpinRef.current) {
+      spinToPrize(pendingSpinRef.current)
+    }
+  }, [spinning, spinToPrize])
 
-      if (winwheelRef.current) {
-        winwheelRef.current.stopAnimation(false)
-        winwheelRef.current = null
-      }
-
-      winwheelRef.current = new window.Winwheel({
-        canvasId: canvasIdRef.current,
-        numSegments: mapped.length || 1,
-        textFontSize: mapped.length > 96 ? 10 : mapped.length > 64 ? 12 : 14,
-        textAlignment: 'outer',
-        textMargin: 18,
-        responsive: true,
-        segments: mapped,
-        animation: {
-          type: 'spinToStop',
-          duration: 5.5,
-          spins: 6,
-          callbackFinished: () => setSpinning(false)
+  const ensureScript = useCallback(
+    (src) =>
+      new Promise((resolve, reject) => {
+        const existing = document.querySelector(`script[src="${src}"]`)
+        if (existing?.dataset.loaded === 'true') {
+          resolve()
+          return
         }
-      })
-    },
+        const script = existing || document.createElement('script')
+        script.src = src
+        script.async = true
+        script.onload = () => {
+          script.dataset.loaded = 'true'
+          resolve()
+        }
+        script.onerror = () => reject(new Error(`No se pudo cargar el script ${src}`))
+        if (!existing) document.body.appendChild(script)
+      }),
     []
   )
+
+  const rebuildWheel = useCallback((segments) => {
+    if (!winwheelReady.current || !window.Winwheel) return
+    const mapped = (segments.length ? segments : FALLBACK_PRIZES).map((prize, idx) => ({
+      fillStyle: SEGMENT_COLORS[idx % SEGMENT_COLORS.length],
+      text: prize.name,
+      prizeId: prize.id
+    }))
+
+    if (winwheelRef.current) {
+      winwheelRef.current.stopAnimation(false)
+      winwheelRef.current = null
+    }
+
+    winwheelRef.current = new window.Winwheel({
+      canvasId: canvasIdRef.current,
+      numSegments: mapped.length || 1,
+      outerRadius: 320,
+      textFontSize: mapped.length > 96 ? 10 : mapped.length > 64 ? 12 : 14,
+      textAlignment: 'outer',
+      textMargin: 18,
+      responsive: true,
+      segments: mapped,
+      animation: {
+        type: 'spinToStop',
+        duration: 5.6,
+        spins: 7,
+        callbackFinished: () => setSpinning(false)
+      }
+    })
+  }, [])
+
+  const spinToPrize = useCallback((target) => {
+    if (!target || !winwheelRef.current || !winwheelReady.current) return
+    const wheel = winwheelRef.current
+    let segmentNumber = 1
+    for (let i = 1; i <= wheel.numSegments; i += 1) {
+      if (wheel.segments[i]?.prizeId === target.id) {
+        segmentNumber = i
+        break
+      }
+    }
+    pendingSpinRef.current = target
+    wheel.stopAnimation(false)
+    wheel.rotationAngle = 0
+    wheel.draw()
+    wheel.animation.stopAngle = wheel.getRandomForSegment(segmentNumber)
+    setSpinning(true)
+    wheel.startAnimation()
+  }, [])
+
+  const loadWinwheel = useCallback(async () => {
+    try {
+      await ensureScript(TWEENMAX_URL)
+      await ensureScript(WINWHEEL_URL)
+      winwheelReady.current = true
+      setWheelReady(true)
+      rebuildWheel(stateRef.current.upcomingPrizes || FALLBACK_PRIZES)
+    } catch (err) {
+      setError(err.message || 'No se pudo cargar la librería de la ruleta')
+    }
+  }, [ensureScript, rebuildWheel])
 
   const handleStateEvent = useCallback(
     (event) => {
@@ -204,16 +258,20 @@ function App() {
       setShowWheelModal(true)
       pendingSpinRef.current = target
       setTargetPrize(target)
-      rebuildWheel(segments)
-      spinToPrize(target)
+      setSpinning(true)
+      if (winwheelReady.current) {
+        spinToPrize(target)
+      }
     },
-    [rebuildWheel, spinToPrize]
+    [spinToPrize]
   )
 
   const handleSpinComplete = useCallback((event) => {
     const payload = JSON.parse(event.data || '{}')
     setWinner(payload)
     setTargetPrize(payload?.prize || pendingSpinRef.current)
+    pendingSpinRef.current = null
+    setSpinning(false)
     launchConfetti()
   }, [])
 
@@ -332,22 +390,6 @@ function App() {
     }
   }
 
-  const wheelStep = wheelSegments.length ? 360 / wheelSegments.length : 0
-  const labelSize = useMemo(() => {
-    const count = wheelSegments.length || 1
-    if (count > 96) return 9
-    if (count > 72) return 10
-    if (count > 48) return 12
-    if (count > 32) return 14
-    return 16
-  }, [wheelSegments.length])
-  const wheelDensityClass = useMemo(() => {
-    if (wheelSegments.length > 96) return 'wheel-packed'
-    if (wheelSegments.length > 64) return 'wheel-dense'
-    if (wheelSegments.length > 32) return 'wheel-roomy'
-    return ''
-  }, [wheelSegments.length])
-
   const remainingPeople = raffleState.waitingPeople?.length || 0
   const remainingPrizes = raffleState.upcomingPrizes?.length || 0
   const selectedParticipant = raffleState.waitingPeople?.find((p) => p.id === selectedParticipantId)
@@ -360,36 +402,20 @@ function App() {
   const Wheel = ({ className = '' }) => (
     <div className="wheel-wrapper">
       <div className="wheel-arrow" aria-hidden="true" />
-      <div
-        className={`wheel-container ${wheelDensityClass} ${spinning ? 'spinning' : ''} ${className}`}
-        style={{
-          transform: `rotate(${rotation}deg)`,
-          transitionDuration: spinning ? '5.5s' : '0.6s'
-        }}
-        onTransitionEnd={() => setSpinning(false)}
-      >
-        <div className="wheel-slices">
-          {wheelSegments.map((prize, idx) => {
-            const angle = idx * wheelStep
-            return (
-              <div
-                key={prize.id}
-                className="slice"
-                style={{
-                  transform: `translateX(-50%) rotate(${angle}deg)`,
-                  backgroundColor: SEGMENT_COLORS[idx % SEGMENT_COLORS.length]
-                }}
-              >
-                <span style={{ transform: `rotate(${-angle}deg)`, fontSize: `${labelSize}px` }}>{prize.name}</span>
-              </div>
-            )
-          })}
-        </div>
+      <div className={`wheel-container ${className}`}>
+        <canvas
+          id={canvasIdRef.current}
+          className="wheel-canvas"
+          width="720"
+          height="720"
+          aria-label="Ruleta de premios"
+        />
         <div className="wheel-center">
           <p className="eyebrow small">Premio</p>
           <strong>{targetPrize?.name || 'Listo para girar'}</strong>
           {selectedParticipant && <p className="helper tiny">Para: {selectedParticipant.name}</p>}
         </div>
+        {!wheelReady && <div className="wheel-overlay">Cargando WinWheel.js</div>}
       </div>
     </div>
   )
