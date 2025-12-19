@@ -106,6 +106,17 @@ function App() {
   const winwheelReady = useRef(false)
 
   const headers = useMemo(() => (token ? { Authorization: `Bearer ${token}` } : {}), [token])
+  const waitingPeople = raffleState.waitingPeople || []
+  const upcomingPrizes = raffleState.upcomingPrizes || []
+  const remainingPeople = waitingPeople.length
+  const remainingPrizes = upcomingPrizes.length
+  const selectedParticipant = waitingPeople.find((p) => p.id === selectedParticipantId)
+  const participantsToShow = showAllParticipants
+    ? waitingPeople
+    : waitingPeople.slice(0, COLLAPSE_COUNT)
+  const prizesToShow = showAllPrizes
+    ? upcomingPrizes
+    : upcomingPrizes.slice(0, COLLAPSE_COUNT)
 
   useEffect(() => {
     stateRef.current = raffleState
@@ -113,13 +124,13 @@ function App() {
 
   useEffect(() => {
     if (!spinning) {
-      const list = raffleState.upcomingPrizes?.length ? raffleState.upcomingPrizes : FALLBACK_PRIZES
+      const list = upcomingPrizes.length ? upcomingPrizes : FALLBACK_PRIZES
       setWheelSegments(list)
     }
-  }, [raffleState.upcomingPrizes, spinning])
+  }, [spinning, upcomingPrizes])
 
   useEffect(() => {
-    const available = raffleState.waitingPeople || []
+    const available = waitingPeople
     if (!available.length) {
       setSelectedParticipantId(null)
       return
@@ -226,7 +237,7 @@ function App() {
 
   const handleStateEvent = useCallback(
     (event) => {
-      const payload = JSON.parse(event.data || '{}')
+      const payload = { ...EMPTY_STATE, ...(JSON.parse(event.data || '{}') || {}) }
       stateRef.current = payload
       setRaffleState(payload)
       setConnectionLost(false)
@@ -344,11 +355,11 @@ function App() {
   }
 
   const choosePrizeForWheel = useCallback(() => {
-    const segments = raffleState.upcomingPrizes?.length ? raffleState.upcomingPrizes : FALLBACK_PRIZES
+    const segments = upcomingPrizes.length ? upcomingPrizes : FALLBACK_PRIZES
     if (!segments.length) return null
     const idx = Math.floor(Math.random() * segments.length)
     return segments[idx]
-  }, [raffleState.upcomingPrizes])
+  }, [upcomingPrizes])
 
   const handleSpinRequest = async () => {
     if (!token) {
@@ -477,7 +488,7 @@ function App() {
                   value={selectedParticipantId || ''}
                   onChange={(e) => setSelectedParticipantId(Number(e.target.value))}
                 >
-                  {raffleState.waitingPeople.map((person) => (
+                  {waitingPeople.map((person) => (
                     <option key={person.id} value={person.id}>{person.name}</option>
                   ))}
                 </select>
@@ -485,9 +496,9 @@ function App() {
                   className="ghost"
                   type="button"
                   onClick={() => {
-                    if (!raffleState.waitingPeople.length) return
-                    const idx = Math.floor(Math.random() * raffleState.waitingPeople.length)
-                    setSelectedParticipantId(raffleState.waitingPeople[idx].id)
+                    if (!waitingPeople.length) return
+                    const idx = Math.floor(Math.random() * waitingPeople.length)
+                    setSelectedParticipantId(waitingPeople[idx].id)
                   }}
                 >
                   Aleatorio
@@ -539,14 +550,21 @@ function App() {
               <p className="eyebrow small">Concursantes</p>
               <h2>En espera ({remainingPeople})</h2>
             </div>
-          </div>
-          <div className="chips-wrapper">
-            <div className="chips">
-              {raffleState.waitingPeople.map((person) => (
-                <span key={person.id} className="chip">{person.name}</span>
-              ))}
-              {raffleState.waitingPeople.length === 0 && <p className="muted">Todos los asistentes ya recibieron premio.</p>}
             </div>
+            <div className="chips-wrapper">
+              <div className="chips">
+                {participantsToShow.map((person) => (
+                  <span key={person.id} className="chip">{person.name}</span>
+                ))}
+              {waitingPeople.length === 0 && <p className="muted">Todos los asistentes ya recibieron premio.</p>}
+              </div>
+            {waitingPeople.length > COLLAPSE_COUNT && (
+              <div className="see-more-row">
+                <button type="button" className="ghost small" onClick={() => setShowAllParticipants((v) => !v)}>
+                  {showAllParticipants ? 'Ver menos' : 'Ver más'}
+                </button>
+              </div>
+            )}
           </div>
         </section>
 
@@ -556,14 +574,21 @@ function App() {
               <p className="eyebrow small">Premios</p>
               <h2>Disponibles ({remainingPrizes})</h2>
             </div>
-          </div>
-          <div className="chips-wrapper">
-            <div className="chips prizes">
-              {raffleState.upcomingPrizes.map((prize) => (
-                <span key={prize.id} className="chip prize">{prize.name}</span>
-              ))}
-              {raffleState.upcomingPrizes.length === 0 && <p className="muted">No quedan premios por asignar.</p>}
             </div>
+            <div className="chips-wrapper">
+              <div className="chips prizes">
+                {prizesToShow.map((prize) => (
+                  <span key={prize.id} className="chip prize">{prize.name}</span>
+                ))}
+              {upcomingPrizes.length === 0 && <p className="muted">No quedan premios por asignar.</p>}
+              </div>
+            {upcomingPrizes.length > COLLAPSE_COUNT && (
+              <div className="see-more-row">
+                <button type="button" className="ghost small" onClick={() => setShowAllPrizes((v) => !v)}>
+                  {showAllPrizes ? 'Ver menos' : 'Ver más'}
+                </button>
+              </div>
+            )}
           </div>
         </section>
       </main>

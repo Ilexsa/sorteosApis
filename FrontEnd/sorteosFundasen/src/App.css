@@ -253,6 +253,11 @@ body {
   transition: background 0.2s ease, transform 0.2s ease;
 }
 
+.ghost.small {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
 .ghost:hover {
   background: rgba(255, 255, 255, 0.16);
   transform: translateY(-1px);
@@ -386,6 +391,12 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.see-more-row {
+  margin-top: 10px;
+  display: flex;
+  justify-content: center;
 }
 
 .chip {
