@@ -173,6 +173,11 @@ body {
   margin: 8px 0 0;
 }
 
+.helper.tiny {
+  font-size: 12px;
+  margin-top: 4px;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -195,6 +200,62 @@ body {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+}
+
+.wheel-heading {
+  align-items: flex-start;
+}
+
+.control-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 18px;
+  align-items: end;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.control-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.control-stack.compact {
+  align-self: stretch;
+  justify-content: center;
+  gap: 10px;
+}
+
+.select-row {
+  display: flex;
+  gap: 10px;
+}
+
+.control-row select {
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(15, 23, 42, 0.85);
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+.ghost {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.ghost:hover {
+  background: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
 }
 
 .wheel-panel {
@@ -262,6 +323,25 @@ body {
   letter-spacing: 1px;
 }
 
+.wheel-container.wheel-roomy .slice span {
+  max-width: 160px;
+}
+
+.wheel-container.wheel-dense .slice span {
+  max-width: 120px;
+  padding: 10px 8px;
+}
+
+.wheel-container.wheel-packed {
+  border-width: 10px;
+}
+
+.wheel-container.wheel-packed .slice span {
+  max-width: 96px;
+  padding: 8px 6px;
+  letter-spacing: 0.5px;
+}
+
 .wheel-center {
   position: absolute;
   top: 50%;
@@ -277,6 +357,17 @@ body {
   text-align: center;
   color: #0f172a;
   padding: 10px;
+}
+
+.wheel-container.wheel-dense .wheel-center {
+  width: 150px;
+  height: 150px;
+}
+
+.wheel-container.wheel-packed .wheel-center {
+  width: 130px;
+  height: 130px;
+  font-size: 14px;
 }
 
 .wheel-arrow {
@@ -504,5 +595,9 @@ body {
 
   .wheel-container {
     width: 100%;
+  }
+
+  .control-row {
+    grid-template-columns: 1fr;
   }
 }
