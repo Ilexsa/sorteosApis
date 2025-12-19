@@ -443,8 +443,8 @@ function App() {
             pantallas. La ruleta elige el premio y la API registra al instante la asignación con el participante seleccionado.
           </p>
           <div className="badges">
-            <span className="badge">Concursantes pendientes: {remainingPeople}</span>
-            <span className="badge">Premios disponibles: {remainingPrizes}</span>
+            <span className="badge">Concursantes pendientes: {remainingPeopleCount}</span>
+            <span className="badge">Premios disponibles: {remainingPrizesCount}</span>
             <span className={`badge ${connectionLost ? 'warn' : 'ok'}`}>
               {connectionLost ? 'Reconectando tiempo real...' : 'Tiempo real activo'}
             </span>
@@ -508,13 +508,13 @@ function App() {
             </div>
             <div className="control-stack compact">
               <p className="eyebrow small">Resumen</p>
-              <div className="pill muted strong">Premios: {remainingPrizes}</div>
-              <div className="pill muted strong">Concursantes: {remainingPeople}</div>
+              <div className="pill muted strong">Premios: {remainingPrizesCount}</div>
+              <div className="pill muted strong">Concursantes: {remainingPeopleCount}</div>
             </div>
           </div>
           <Wheel />
           <div className="cta-row">
-            <button className="cta" onClick={handleSpinRequest} disabled={!token || loadingSpin || spinning || !remainingPrizes}>
+            <button className="cta" onClick={handleSpinRequest} disabled={!token || loadingSpin || spinning || !remainingPrizesCount}>
               {loadingSpin ? 'Registrando giro...' : 'Girar y asignar premio'}
             </button>
             <p className="helper">
@@ -548,7 +548,7 @@ function App() {
           <div className="panel-heading">
             <div>
               <p className="eyebrow small">Concursantes</p>
-              <h2>En espera ({remainingPeople})</h2>
+              <h2>En espera ({remainingPeopleCount})</h2>
             </div>
             </div>
             <div className="chips-wrapper">
@@ -572,7 +572,7 @@ function App() {
           <div className="panel-heading">
             <div>
               <p className="eyebrow small">Premios</p>
-              <h2>Disponibles ({remainingPrizes})</h2>
+              <h2>Disponibles ({remainingPrizesCount})</h2>
             </div>
             </div>
             <div className="chips-wrapper">
