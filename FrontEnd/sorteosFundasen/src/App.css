@@ -294,6 +294,25 @@ body {
   border-width: 10px;
 }
 
+.wheel-container.wheel-roomy .slice span {
+  max-width: 160px;
+}
+
+.wheel-container.wheel-dense .slice span {
+  max-width: 120px;
+  padding: 10px 8px;
+}
+
+.wheel-container.wheel-packed {
+  border-width: 10px;
+}
+
+.wheel-container.wheel-packed .slice span {
+  max-width: 96px;
+  padding: 8px 6px;
+  letter-spacing: 0.5px;
+}
+
 .wheel-center {
   position: absolute;
   top: 50%;
