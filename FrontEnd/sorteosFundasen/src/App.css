@@ -412,6 +412,45 @@ body {
   color: #fde047;
 }
 
+.wheel-modal .modal-card {
+  width: min(1100px, 96vw);
+  background: rgba(15, 23, 42, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.wheel-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal-heading h3 {
+  margin: 4px 0 6px;
+  font-size: 24px;
+}
+
+.wheel-container.giant {
+  width: clamp(620px, 80vw, 980px);
+  border-width: 18px;
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.55), inset 0 0 0 8px rgba(255, 255, 255, 0.1);
+}
+
+.wheel-container.giant .wheel-center {
+  width: 210px;
+  height: 210px;
+  font-size: 18px;
+}
+
+.wheel-container.giant .slice span {
+  max-width: 220px;
+  font-size: 15px;
+}
+
+.winner-inline {
+  text-align: center;
+  margin-top: 8px;
+}
+
 .confetti-wrapper {
   position: fixed;
   inset: 0;
