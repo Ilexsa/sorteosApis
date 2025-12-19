@@ -98,6 +98,8 @@ function App() {
   const stateRef = useRef(EMPTY_STATE)
   const rotationRef = useRef(0)
   const pendingSpinRef = useRef(null)
+  const eventSourceRef = useRef(null)
+  const reconnectTimer = useRef(null)
 
   const headers = useMemo(() => (token ? { Authorization: `Bearer ${token}` } : {}), [token])
 
@@ -199,15 +201,35 @@ function App() {
     launchConfetti()
   }, [])
 
-  useEffect(() => {
-    const eventSource = new EventSource(`${API_BASE}/events`)
-    eventSource.addEventListener('state', handleStateEvent)
-    eventSource.addEventListener('spin-start', handleSpinStart)
-    eventSource.addEventListener('spin-complete', handleSpinComplete)
-    eventSource.onerror = () => setConnectionLost(true)
-    eventSource.onopen = () => setConnectionLost(false)
-    return () => eventSource.close()
+  const setupEventStream = useCallback(() => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close()
+    }
+    const es = new EventSource(`${API_BASE}/events`)
+    eventSourceRef.current = es
+    es.addEventListener('state', handleStateEvent)
+    es.addEventListener('spin-start', handleSpinStart)
+    es.addEventListener('spin-complete', handleSpinComplete)
+    es.onerror = () => {
+      setConnectionLost(true)
+      es.close()
+      if (!reconnectTimer.current) {
+        reconnectTimer.current = setTimeout(() => {
+          reconnectTimer.current = null
+          setupEventStream()
+        }, 1500)
+      }
+    }
+    es.onopen = () => setConnectionLost(false)
   }, [handleSpinComplete, handleSpinStart, handleStateEvent])
+
+  useEffect(() => {
+    setupEventStream()
+    return () => {
+      if (eventSourceRef.current) eventSourceRef.current.close()
+      if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
+    }
+  }, [setupEventStream])
 
   const fetchInitialState = useCallback(async () => {
     try {
@@ -282,6 +304,7 @@ function App() {
       if (!res.ok) {
         throw new Error(data.error || 'No se pudo registrar el giro')
       }
+      fetchInitialState()
     } catch (err) {
       setError(err.message)
       setShowWheelModal(false)
