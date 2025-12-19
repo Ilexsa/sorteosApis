@@ -66,7 +66,7 @@ function formatDate(value) {
 function launchConfetti() {
   const wrapper = document.createElement('div')
   wrapper.className = 'confetti-wrapper'
-  for (let i = 0; i < 140; i += 1) {
+  for (let i = 0; i < 96; i += 1) {
     const piece = document.createElement('span')
     piece.className = 'confetti-piece'
     piece.style.left = `${Math.random() * 100}%`
