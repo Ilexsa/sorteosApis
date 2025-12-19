@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"math/rand"
 	"sync"
 	"time"
 
@@ -46,56 +45,81 @@ func samplePrizes() []models.Prize {
 	}
 }
 
-func (r *InMemoryRepository) Snapshot(_ context.Context) ([]models.Person, []models.Prize, []models.WinnerRecord, error) {
+func (r *InMemoryRepository) ListParticipants(_ context.Context) ([]models.Person, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
 	people := make([]models.Person, len(r.people))
 	copy(people, r.people)
-	prizes := make([]models.Prize, len(r.prizes))
-	copy(prizes, r.prizes)
-	winners := make([]models.WinnerRecord, len(r.winners))
-	copy(winners, r.winners)
-	return people, prizes, winners, nil
+	return people, nil
 }
 
-func (r *InMemoryRepository) Draw(_ context.Context, prizeID int) (models.WinnerRecord, error) {
+func (r *InMemoryRepository) ListPrizes(_ context.Context) ([]models.Prize, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if len(r.people) == 0 {
-		return models.WinnerRecord{}, ErrNoParticipants
-	}
-	if len(r.prizes) == 0 {
-		return models.WinnerRecord{}, ErrNoPrizes
+	prizes := make([]models.Prize, len(r.prizes))
+	copy(prizes, r.prizes)
+	return prizes, nil
+}
+
+func (r *InMemoryRepository) ListRecentWinners(_ context.Context, limit int) ([]models.WinnerRecord, error) {
+	if limit <= 0 {
+		return nil, ErrRecentWinnersInvalid
 	}
 
-	personIdx := rand.Intn(len(r.people))
-	prizeIdx := -1
-	if prizeID > 0 {
-		for i, prize := range r.prizes {
-			if prize.ID == prizeID {
-				prizeIdx = i
-				break
-			}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if len(r.winners) < limit {
+		limit = len(r.winners)
+	}
+	winners := make([]models.WinnerRecord, limit)
+	copy(winners, r.winners[:limit])
+	return winners, nil
+}
+
+func (r *InMemoryRepository) SaveAward(_ context.Context, participantID, prizeID int) (models.WinnerRecord, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if participantID == 0 || prizeID == 0 {
+		return models.WinnerRecord{}, ErrNothingToRegister
+	}
+
+	var personIdx = -1
+	for i, p := range r.people {
+		if p.ID == participantID {
+			personIdx = i
+			break
 		}
-		if prizeIdx == -1 {
-			return models.WinnerRecord{}, ErrPrizeUnavailable
+	}
+	if personIdx == -1 {
+		return models.WinnerRecord{}, ErrParticipantUsed
+	}
+
+	var prizeIdx = -1
+	for i, pr := range r.prizes {
+		if pr.ID == prizeID {
+			prizeIdx = i
+			break
 		}
-	} else {
-		prizeIdx = rand.Intn(len(r.prizes))
+	}
+	if prizeIdx == -1 {
+		return models.WinnerRecord{}, ErrPrizeUnavailable
 	}
 
 	person := r.people[personIdx]
-	r.people = append(r.people[:personIdx], r.people[personIdx+1:]...)
-
 	prize := r.prizes[prizeIdx]
+
+	r.people = append(r.people[:personIdx], r.people[personIdx+1:]...)
 	r.prizes = append(r.prizes[:prizeIdx], r.prizes[prizeIdx+1:]...)
 
 	record := models.WinnerRecord{
 		ID:        r.nextWinnerID,
 		Person:    person,
 		Prize:     prize,
-		AwardedAt: time.Now(),
+		AwardedAt: time.Now().UTC(),
 	}
 	r.nextWinnerID++
 	r.winners = append([]models.WinnerRecord{record}, r.winners...)
