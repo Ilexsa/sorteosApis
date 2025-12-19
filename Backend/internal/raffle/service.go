@@ -2,6 +2,8 @@ package raffle
 
 import (
 	"context"
+	"errors"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -14,6 +16,7 @@ type Service struct {
 	clientsMu sync.Mutex
 	drawMu    sync.Mutex
 	clients   map[*Client]struct{}
+	rng       *rand.Rand
 }
 
 type Client struct {
@@ -34,6 +37,7 @@ func NewService(repo repository.Repository) *Service {
 	return &Service{
 		repo:    repo,
 		clients: map[*Client]struct{}{},
+		rng:     rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
@@ -87,20 +91,50 @@ func (s *Service) State(ctx context.Context) (models.RaffleState, error) {
 	}, nil
 }
 
+type SpinEnvelope struct {
+	StartedAt       time.Time      `json:"startedAt"`
+	TargetPrize     models.Prize   `json:"targetPrize"`
+	Segments        []models.Prize `json:"segments"`
+	RemainingPeople int            `json:"remainingPeople"`
+	RemainingPrizes int            `json:"remainingPrizes"`
+}
+
 func (s *Service) Draw(ctx context.Context, prizeID int) (models.WinnerRecord, error) {
 	s.drawMu.Lock()
-	record, err := s.repo.Draw(ctx, prizeID)
-	if err == nil {
-		s.broadcast(Event{Type: "draw-start", Data: map[string]interface{}{"startedAt": time.Now().UTC(), "person": record.Person, "prize": record.Prize}})
+	defer s.drawMu.Unlock()
+
+	people, prizes, _, err := s.repo.Snapshot(ctx)
+	if err != nil {
+		return models.WinnerRecord{}, err
 	}
-	s.drawMu.Unlock()
+	if len(people) == 0 {
+		return models.WinnerRecord{}, repository.ErrNoParticipants
+	}
+	if len(prizes) == 0 {
+		return models.WinnerRecord{}, repository.ErrNoPrizes
+	}
+
+	targetPrize, err := s.pickPrize(prizes, prizeID)
 	if err != nil {
 		return models.WinnerRecord{}, err
 	}
 
-	time.Sleep(1500 * time.Millisecond)
+	spin := SpinEnvelope{
+		StartedAt:       time.Now().UTC(),
+		TargetPrize:     targetPrize,
+		Segments:        append([]models.Prize(nil), prizes...),
+		RemainingPeople: len(people),
+		RemainingPrizes: len(prizes),
+	}
+	s.broadcast(Event{Type: "spin-start", Data: spin})
 
-	s.broadcast(Event{Type: "winner", Data: record})
+	record, err := s.repo.Draw(ctx, targetPrize.ID)
+	if err != nil {
+		s.broadcast(Event{Type: "error", Data: err.Error()})
+		return models.WinnerRecord{}, err
+	}
+
+	s.broadcast(Event{Type: "spin-complete", Data: record})
 	if state, err := s.State(ctx); err == nil {
 		s.broadcast(Event{Type: "state", Data: state})
 	} else {
@@ -108,4 +142,26 @@ func (s *Service) Draw(ctx context.Context, prizeID int) (models.WinnerRecord, e
 	}
 
 	return record, nil
+}
+
+func (s *Service) pickPrize(prizes []models.Prize, prizeID int) (models.Prize, error) {
+	if len(prizes) == 0 {
+		return models.Prize{}, repository.ErrNoPrizes
+	}
+	if prizeID > 0 {
+		for _, prize := range prizes {
+			if prize.ID == prizeID {
+				return prize, nil
+			}
+		}
+		return models.Prize{}, repository.ErrPrizeUnavailable
+	}
+	if len(prizes) == 1 {
+		return prizes[0], nil
+	}
+	index := s.rng.Intn(len(prizes))
+	if index < 0 || index >= len(prizes) {
+		return models.Prize{}, errors.New("índice de premio inválido")
+	}
+	return prizes[index], nil
 }
