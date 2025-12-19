@@ -48,7 +48,7 @@ func main() {
 	{
 		api.POST("/auth/login", apiHandler.Login)
 		api.GET("/state", apiHandler.GetState)
-		api.POST("/draw", apiHandler.AdminOnly(apiHandler.RunDraw))
+		api.POST("/spin", apiHandler.AdminOnly(apiHandler.RegisterSpin))
 	}
 
 	router.GET("/events", apiHandler.StreamEvents)
