@@ -2,8 +2,6 @@ package raffle
 
 import (
 	"context"
-	"errors"
-	"math/rand"
 	"sync"
 	"time"
 
@@ -14,9 +12,7 @@ import (
 type Service struct {
 	repo      repository.Repository
 	clientsMu sync.Mutex
-	drawMu    sync.Mutex
 	clients   map[*Client]struct{}
-	rng       *rand.Rand
 }
 
 type Client struct {
@@ -37,7 +33,6 @@ func NewService(repo repository.Repository) *Service {
 	return &Service{
 		repo:    repo,
 		clients: map[*Client]struct{}{},
-		rng:     rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
@@ -78,10 +73,21 @@ func (s *Service) broadcast(evt Event) {
 }
 
 func (s *Service) State(ctx context.Context) (models.RaffleState, error) {
-	people, prizes, winners, err := s.repo.Snapshot(ctx)
+	people, err := s.repo.ListParticipants(ctx)
 	if err != nil {
 		return models.RaffleState{}, err
 	}
+
+	prizes, err := s.repo.ListPrizes(ctx)
+	if err != nil {
+		return models.RaffleState{}, err
+	}
+
+	winners, err := s.repo.ListRecentWinners(ctx, 5)
+	if err != nil {
+		return models.RaffleState{}, err
+	}
+
 	return models.RaffleState{
 		RemainingPeople: len(people),
 		RemainingPrizes: len(prizes),
@@ -93,42 +99,61 @@ func (s *Service) State(ctx context.Context) (models.RaffleState, error) {
 
 type SpinEnvelope struct {
 	StartedAt       time.Time      `json:"startedAt"`
-	TargetPrize     models.Prize   `json:"targetPrize"`
+	SelectedPrize   models.Prize   `json:"selectedPrize"`
+	SelectedPerson  models.Person  `json:"selectedPerson"`
 	Segments        []models.Prize `json:"segments"`
 	RemainingPeople int            `json:"remainingPeople"`
 	RemainingPrizes int            `json:"remainingPrizes"`
 }
 
-func (s *Service) Draw(ctx context.Context, prizeID int) (models.WinnerRecord, error) {
-	s.drawMu.Lock()
-	defer s.drawMu.Unlock()
+func (s *Service) RegisterSpin(ctx context.Context, participantID, prizeID int) (models.WinnerRecord, error) {
+	if participantID == 0 || prizeID == 0 {
+		return models.WinnerRecord{}, repository.ErrNothingToRegister
+	}
 
-	people, prizes, _, err := s.repo.Snapshot(ctx)
+	people, err := s.repo.ListParticipants(ctx)
 	if err != nil {
 		return models.WinnerRecord{}, err
 	}
-	if len(people) == 0 {
-		return models.WinnerRecord{}, repository.ErrNoParticipants
-	}
-	if len(prizes) == 0 {
-		return models.WinnerRecord{}, repository.ErrNoPrizes
-	}
 
-	targetPrize, err := s.pickPrize(prizes, prizeID)
+	prizes, err := s.repo.ListPrizes(ctx)
 	if err != nil {
 		return models.WinnerRecord{}, err
+	}
+
+	var person models.Person
+	for _, p := range people {
+		if p.ID == participantID {
+			person = p
+			break
+		}
+	}
+	if person.ID == 0 {
+		return models.WinnerRecord{}, repository.ErrParticipantUsed
+	}
+
+	var prize models.Prize
+	for _, pr := range prizes {
+		if pr.ID == prizeID {
+			prize = pr
+			break
+		}
+	}
+	if prize.ID == 0 {
+		return models.WinnerRecord{}, repository.ErrPrizeUnavailable
 	}
 
 	spin := SpinEnvelope{
 		StartedAt:       time.Now().UTC(),
-		TargetPrize:     targetPrize,
+		SelectedPrize:   prize,
+		SelectedPerson:  person,
 		Segments:        append([]models.Prize(nil), prizes...),
 		RemainingPeople: len(people),
 		RemainingPrizes: len(prizes),
 	}
 	s.broadcast(Event{Type: "spin-start", Data: spin})
 
-	record, err := s.repo.Draw(ctx, targetPrize.ID)
+	record, err := s.repo.SaveAward(ctx, participantID, prizeID)
 	if err != nil {
 		s.broadcast(Event{Type: "error", Data: err.Error()})
 		return models.WinnerRecord{}, err
@@ -142,26 +167,4 @@ func (s *Service) Draw(ctx context.Context, prizeID int) (models.WinnerRecord, e
 	}
 
 	return record, nil
-}
-
-func (s *Service) pickPrize(prizes []models.Prize, prizeID int) (models.Prize, error) {
-	if len(prizes) == 0 {
-		return models.Prize{}, repository.ErrNoPrizes
-	}
-	if prizeID > 0 {
-		for _, prize := range prizes {
-			if prize.ID == prizeID {
-				return prize, nil
-			}
-		}
-		return models.Prize{}, repository.ErrPrizeUnavailable
-	}
-	if len(prizes) == 1 {
-		return prizes[0], nil
-	}
-	index := s.rng.Intn(len(prizes))
-	if index < 0 || index >= len(prizes) {
-		return models.Prize{}, errors.New("índice de premio inválido")
-	}
-	return prizes[index], nil
 }
