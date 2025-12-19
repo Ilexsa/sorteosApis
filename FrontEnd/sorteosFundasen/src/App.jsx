@@ -88,7 +88,6 @@ function App() {
   const [loadingSpin, setLoadingSpin] = useState(false)
   const [wheelSegments, setWheelSegments] = useState(FALLBACK_PRIZES)
   const [targetPrize, setTargetPrize] = useState(null)
-  const [rotation, setRotation] = useState(0)
   const [spinning, setSpinning] = useState(false)
   const [winner, setWinner] = useState(null)
   const [connectionLost, setConnectionLost] = useState(false)
@@ -96,7 +95,6 @@ function App() {
   const [selectedParticipantId, setSelectedParticipantId] = useState(null)
 
   const stateRef = useRef(EMPTY_STATE)
-  const rotationRef = useRef(0)
   const pendingSpinRef = useRef(null)
   const eventSourceRef = useRef(null)
   const reconnectTimer = useRef(null)
@@ -139,22 +137,37 @@ function App() {
     return rotationRef.current + stopAngle
   }, [])
 
-  const triggerSpin = useCallback(
-    (segments, target) => {
-      if (!segments.length) return
-      const resolvedTarget = target?.id
-        ? segments.find((item) => item.id === target.id) || segments[0]
-        : segments[0]
+  const rebuildWheel = useCallback(
+    (segments) => {
+      if (!winwheelReady.current || !window.Winwheel) return
+      const mapped = (segments.length ? segments : FALLBACK_PRIZES).map((prize, idx) => ({
+        fillStyle: SEGMENT_COLORS[idx % SEGMENT_COLORS.length],
+        text: prize.name,
+        prizeId: prize.id
+      }))
 
-      pendingSpinRef.current = resolvedTarget
-      setTargetPrize(resolvedTarget)
-      const nextRotation = computeTargetRotation(segments, resolvedTarget)
-      rotationRef.current = nextRotation
-      setRotation(nextRotation)
-      setSpinning(true)
-      setShowWheelModal(true)
+      if (winwheelRef.current) {
+        winwheelRef.current.stopAnimation(false)
+        winwheelRef.current = null
+      }
+
+      winwheelRef.current = new window.Winwheel({
+        canvasId: canvasIdRef.current,
+        numSegments: mapped.length || 1,
+        textFontSize: mapped.length > 96 ? 10 : mapped.length > 64 ? 12 : 14,
+        textAlignment: 'outer',
+        textMargin: 18,
+        responsive: true,
+        segments: mapped,
+        animation: {
+          type: 'spinToStop',
+          duration: 5.5,
+          spins: 6,
+          callbackFinished: () => setSpinning(false)
+        }
+      })
     },
-    [computeTargetRotation]
+    []
   )
 
   const handleStateEvent = useCallback(
@@ -189,9 +202,12 @@ function App() {
       setWheelSegments(segments)
       setWinner(null)
       setShowWheelModal(true)
-      triggerSpin(segments, target)
+      pendingSpinRef.current = target
+      setTargetPrize(target)
+      rebuildWheel(segments)
+      spinToPrize(target)
     },
-    [triggerSpin]
+    [rebuildWheel, spinToPrize]
   )
 
   const handleSpinComplete = useCallback((event) => {
@@ -240,14 +256,16 @@ function App() {
       setRaffleState(data)
       const prizes = data.upcomingPrizes?.length ? data.upcomingPrizes : FALLBACK_PRIZES
       setWheelSegments(prizes)
+      rebuildWheel(prizes)
     } catch (err) {
       setError(err.message)
     }
-  }, [])
+  }, [rebuildWheel])
 
   useEffect(() => {
+    loadWinwheel()
     fetchInitialState()
-  }, [fetchInitialState])
+  }, [fetchInitialState, loadWinwheel])
 
   const handleLogin = async (e) => {
     e.preventDefault()

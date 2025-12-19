@@ -281,46 +281,17 @@ body {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), inset 0 0 0 6px rgba(255, 255, 255, 0.12);
 }
 
+.wheel-canvas {
+  width: 100%;
+  height: 100%;
+}
+
 .wheel-container.spinning {
   filter: drop-shadow(0 16px 40px rgba(0, 0, 0, 0.45));
 }
 
-.wheel-slices {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  overflow: hidden;
-}
-
-.slice {
-  height: 50%;
-  width: 46%;
-  position: absolute;
-  clip-path: polygon(100% 0 , 50% 100% , 0 0);
-  transform: translateX(-50%);
-  transform-origin: bottom;
-  text-align: center;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  font-weight: 800;
-  color: #fff;
-  left: 50%;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
-}
-
-.slice span {
-  display: block;
-  padding: 12px 10px;
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  backdrop-filter: blur(4px);
-  max-width: 180px;
-  writing-mode: vertical-rl;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+.wheel-container.wheel-packed {
+  border-width: 10px;
 }
 
 .wheel-container.wheel-roomy .slice span {
