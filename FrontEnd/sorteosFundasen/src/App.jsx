@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://10.1.0.6:8080'
+const TWEENMAX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/gsap/1.20.4/TweenMax.min.js'
+const WINWHEEL_URL = 'https://cdn.jsdelivr.net/npm/winwheel@2.9.0/Winwheel.min.js'
+const COLLAPSE_COUNT = 14
 
 const EMPTY_STATE = {
   remainingPeople: 0,
@@ -93,13 +96,30 @@ function App() {
   const [connectionLost, setConnectionLost] = useState(false)
   const [showWheelModal, setShowWheelModal] = useState(false)
   const [selectedParticipantId, setSelectedParticipantId] = useState(null)
+  const [wheelReady, setWheelReady] = useState(false)
+  const [showAllParticipants, setShowAllParticipants] = useState(false)
+  const [showAllPrizes, setShowAllPrizes] = useState(false)
 
   const stateRef = useRef(EMPTY_STATE)
   const pendingSpinRef = useRef(null)
   const eventSourceRef = useRef(null)
   const reconnectTimer = useRef(null)
+  const canvasIdRef = useRef('fundasen-wheel-canvas')
+  const winwheelRef = useRef(null)
+  const winwheelReady = useRef(false)
 
   const headers = useMemo(() => (token ? { Authorization: `Bearer ${token}` } : {}), [token])
+  const waitingPeople = raffleState.waitingPeople || []
+  const upcomingPrizes = raffleState.upcomingPrizes || []
+  const remainingPeopleCount = waitingPeople.length
+  const remainingPrizesCount = upcomingPrizes.length
+  const selectedParticipant = waitingPeople.find((p) => p.id === selectedParticipantId)
+  const participantsToShow = showAllParticipants
+    ? waitingPeople
+    : waitingPeople.slice(0, COLLAPSE_COUNT)
+  const prizesToShow = showAllPrizes
+    ? upcomingPrizes
+    : upcomingPrizes.slice(0, COLLAPSE_COUNT)
 
   useEffect(() => {
     stateRef.current = raffleState
@@ -107,13 +127,13 @@ function App() {
 
   useEffect(() => {
     if (!spinning) {
-      const list = raffleState.upcomingPrizes?.length ? raffleState.upcomingPrizes : FALLBACK_PRIZES
+      const list = upcomingPrizes.length ? upcomingPrizes : FALLBACK_PRIZES
       setWheelSegments(list)
     }
-  }, [raffleState.upcomingPrizes, spinning])
+  }, [spinning, upcomingPrizes])
 
   useEffect(() => {
-    const available = raffleState.waitingPeople || []
+    const available = waitingPeople
     if (!available.length) {
       setSelectedParticipantId(null)
       return
@@ -121,58 +141,119 @@ function App() {
     if (!available.some((person) => person.id === selectedParticipantId)) {
       setSelectedParticipantId(available[0].id)
     }
-  }, [raffleState.waitingPeople, selectedParticipantId])
+  }, [waitingPeople, selectedParticipantId])
 
-  const computeTargetRotation = useCallback((segments, target) => {
-    if (!segments.length) return rotationRef.current
-    const step = 360 / segments.length
-    const idx = Math.max(
-      segments.findIndex((item) => item.id === target?.id),
-      0
-    )
-    const center = idx * step + step / 2
-    const baseTurns = 6 * 360
-    const wobble = step * 0.15
-    const stopAngle = baseTurns + (360 - center) + (Math.random() * wobble - wobble / 2)
-    return rotationRef.current + stopAngle
-  }, [])
+  useEffect(() => {
+    if (waitingPeople.length <= 14 && showAllParticipants) {
+      setShowAllParticipants(false)
+    }
+  }, [waitingPeople, showAllParticipants])
 
-  const rebuildWheel = useCallback(
-    (segments) => {
-      if (!winwheelReady.current || !window.Winwheel) return
-      const mapped = (segments.length ? segments : FALLBACK_PRIZES).map((prize, idx) => ({
-        fillStyle: SEGMENT_COLORS[idx % SEGMENT_COLORS.length],
-        text: prize.name,
-        prizeId: prize.id
-      }))
+  useEffect(() => {
+    if (upcomingPrizes.length <= 14 && showAllPrizes) {
+      setShowAllPrizes(false)
+    }
+  }, [upcomingPrizes, showAllPrizes])
 
-      if (winwheelRef.current) {
-        winwheelRef.current.stopAnimation(false)
-        winwheelRef.current = null
-      }
+  useEffect(() => {
+    if (winwheelReady.current) {
+      rebuildWheel(wheelSegments)
+    }
+  }, [rebuildWheel, wheelSegments])
 
-      winwheelRef.current = new window.Winwheel({
-        canvasId: canvasIdRef.current,
-        numSegments: mapped.length || 1,
-        textFontSize: mapped.length > 96 ? 10 : mapped.length > 64 ? 12 : 14,
-        textAlignment: 'outer',
-        textMargin: 18,
-        responsive: true,
-        segments: mapped,
-        animation: {
-          type: 'spinToStop',
-          duration: 5.5,
-          spins: 6,
-          callbackFinished: () => setSpinning(false)
+  useEffect(() => {
+    if (winwheelReady.current && spinning && pendingSpinRef.current) {
+      spinToPrize(pendingSpinRef.current)
+    }
+  }, [spinning, spinToPrize])
+
+  const ensureScript = useCallback(
+    (src) =>
+      new Promise((resolve, reject) => {
+        const existing = document.querySelector(`script[src="${src}"]`)
+        if (existing?.dataset.loaded === 'true') {
+          resolve()
+          return
         }
-      })
-    },
+        const script = existing || document.createElement('script')
+        script.src = src
+        script.async = true
+        script.onload = () => {
+          script.dataset.loaded = 'true'
+          resolve()
+        }
+        script.onerror = () => reject(new Error(`No se pudo cargar el script ${src}`))
+        if (!existing) document.body.appendChild(script)
+      }),
     []
   )
 
+  const rebuildWheel = useCallback((segments) => {
+    if (!winwheelReady.current || !window.Winwheel) return
+    const mapped = (segments.length ? segments : FALLBACK_PRIZES).map((prize, idx) => ({
+      fillStyle: SEGMENT_COLORS[idx % SEGMENT_COLORS.length],
+      text: prize.name,
+      prizeId: prize.id
+    }))
+
+    if (winwheelRef.current) {
+      winwheelRef.current.stopAnimation(false)
+      winwheelRef.current = null
+    }
+
+    winwheelRef.current = new window.Winwheel({
+      canvasId: canvasIdRef.current,
+      numSegments: mapped.length || 1,
+      outerRadius: 320,
+      textFontSize: mapped.length > 96 ? 10 : mapped.length > 64 ? 12 : 14,
+      textAlignment: 'outer',
+      textMargin: 18,
+      responsive: true,
+      segments: mapped,
+      animation: {
+        type: 'spinToStop',
+        duration: 5.6,
+        spins: 7,
+        callbackFinished: () => setSpinning(false)
+      }
+    })
+  }, [])
+
+  const spinToPrize = useCallback((target) => {
+    if (!target || !winwheelRef.current || !winwheelReady.current) return
+    const wheel = winwheelRef.current
+    let segmentNumber = 1
+    for (let i = 1; i <= wheel.numSegments; i += 1) {
+      if (wheel.segments[i]?.prizeId === target.id) {
+        segmentNumber = i
+        break
+      }
+    }
+    pendingSpinRef.current = target
+    wheel.stopAnimation(false)
+    wheel.rotationAngle = 0
+    wheel.draw()
+    wheel.animation.stopAngle = wheel.getRandomForSegment(segmentNumber)
+    setSpinning(true)
+    wheel.startAnimation()
+  }, [])
+
+  const loadWinwheel = useCallback(async () => {
+    try {
+      if (typeof window === 'undefined' || typeof document === 'undefined') return
+      await ensureScript(TWEENMAX_URL)
+      await ensureScript(WINWHEEL_URL)
+      winwheelReady.current = true
+      setWheelReady(true)
+      rebuildWheel(stateRef.current.upcomingPrizes || FALLBACK_PRIZES)
+    } catch (err) {
+      setError(err.message || 'No se pudo cargar la librería de la ruleta')
+    }
+  }, [ensureScript, rebuildWheel])
+
   const handleStateEvent = useCallback(
     (event) => {
-      const payload = JSON.parse(event.data || '{}')
+      const payload = { ...EMPTY_STATE, ...(JSON.parse(event.data || '{}') || {}) }
       stateRef.current = payload
       setRaffleState(payload)
       setConnectionLost(false)
@@ -204,16 +285,20 @@ function App() {
       setShowWheelModal(true)
       pendingSpinRef.current = target
       setTargetPrize(target)
-      rebuildWheel(segments)
-      spinToPrize(target)
+      setSpinning(true)
+      if (winwheelReady.current) {
+        spinToPrize(target)
+      }
     },
-    [rebuildWheel, spinToPrize]
+    [spinToPrize]
   )
 
   const handleSpinComplete = useCallback((event) => {
     const payload = JSON.parse(event.data || '{}')
     setWinner(payload)
     setTargetPrize(payload?.prize || pendingSpinRef.current)
+    pendingSpinRef.current = null
+    setSpinning(false)
     launchConfetti()
   }, [])
 
@@ -286,11 +371,11 @@ function App() {
   }
 
   const choosePrizeForWheel = useCallback(() => {
-    const segments = raffleState.upcomingPrizes?.length ? raffleState.upcomingPrizes : FALLBACK_PRIZES
+    const segments = upcomingPrizes.length ? upcomingPrizes : FALLBACK_PRIZES
     if (!segments.length) return null
     const idx = Math.floor(Math.random() * segments.length)
     return segments[idx]
-  }, [raffleState.upcomingPrizes])
+  }, [upcomingPrizes])
 
   const handleSpinRequest = async () => {
     if (!token) {
@@ -332,26 +417,6 @@ function App() {
     }
   }
 
-  const wheelStep = wheelSegments.length ? 360 / wheelSegments.length : 0
-  const labelSize = useMemo(() => {
-    const count = wheelSegments.length || 1
-    if (count > 96) return 9
-    if (count > 72) return 10
-    if (count > 48) return 12
-    if (count > 32) return 14
-    return 16
-  }, [wheelSegments.length])
-  const wheelDensityClass = useMemo(() => {
-    if (wheelSegments.length > 96) return 'wheel-packed'
-    if (wheelSegments.length > 64) return 'wheel-dense'
-    if (wheelSegments.length > 32) return 'wheel-roomy'
-    return ''
-  }, [wheelSegments.length])
-
-  const remainingPeople = raffleState.waitingPeople?.length || 0
-  const remainingPrizes = raffleState.upcomingPrizes?.length || 0
-  const selectedParticipant = raffleState.waitingPeople?.find((p) => p.id === selectedParticipantId)
-
   const closeWinner = () => {
     setWinner(null)
     setShowWheelModal(false)
@@ -360,36 +425,20 @@ function App() {
   const Wheel = ({ className = '' }) => (
     <div className="wheel-wrapper">
       <div className="wheel-arrow" aria-hidden="true" />
-      <div
-        className={`wheel-container ${wheelDensityClass} ${spinning ? 'spinning' : ''} ${className}`}
-        style={{
-          transform: `rotate(${rotation}deg)`,
-          transitionDuration: spinning ? '5.5s' : '0.6s'
-        }}
-        onTransitionEnd={() => setSpinning(false)}
-      >
-        <div className="wheel-slices">
-          {wheelSegments.map((prize, idx) => {
-            const angle = idx * wheelStep
-            return (
-              <div
-                key={prize.id}
-                className="slice"
-                style={{
-                  transform: `translateX(-50%) rotate(${angle}deg)`,
-                  backgroundColor: SEGMENT_COLORS[idx % SEGMENT_COLORS.length]
-                }}
-              >
-                <span style={{ transform: `rotate(${-angle}deg)`, fontSize: `${labelSize}px` }}>{prize.name}</span>
-              </div>
-            )
-          })}
-        </div>
+      <div className={`wheel-container ${className}`}>
+        <canvas
+          id={canvasIdRef.current}
+          className="wheel-canvas"
+          width="720"
+          height="720"
+          aria-label="Ruleta de premios"
+        />
         <div className="wheel-center">
           <p className="eyebrow small">Premio</p>
           <strong>{targetPrize?.name || 'Listo para girar'}</strong>
           {selectedParticipant && <p className="helper tiny">Para: {selectedParticipant.name}</p>}
         </div>
+        {!wheelReady && <div className="wheel-overlay">Cargando WinWheel.js</div>}
       </div>
     </div>
   )
@@ -406,8 +455,8 @@ function App() {
             pantallas. La ruleta elige el premio y la API registra al instante la asignación con el participante seleccionado.
           </p>
           <div className="badges">
-            <span className="badge">Concursantes pendientes: {remainingPeople}</span>
-            <span className="badge">Premios disponibles: {remainingPrizes}</span>
+            <span className="badge">Concursantes pendientes: {remainingPeopleCount}</span>
+            <span className="badge">Premios disponibles: {remainingPrizesCount}</span>
             <span className={`badge ${connectionLost ? 'warn' : 'ok'}`}>
               {connectionLost ? 'Reconectando tiempo real...' : 'Tiempo real activo'}
             </span>
@@ -451,7 +500,7 @@ function App() {
                   value={selectedParticipantId || ''}
                   onChange={(e) => setSelectedParticipantId(Number(e.target.value))}
                 >
-                  {raffleState.waitingPeople.map((person) => (
+                  {waitingPeople.map((person) => (
                     <option key={person.id} value={person.id}>{person.name}</option>
                   ))}
                 </select>
@@ -459,9 +508,9 @@ function App() {
                   className="ghost"
                   type="button"
                   onClick={() => {
-                    if (!raffleState.waitingPeople.length) return
-                    const idx = Math.floor(Math.random() * raffleState.waitingPeople.length)
-                    setSelectedParticipantId(raffleState.waitingPeople[idx].id)
+                    if (!waitingPeople.length) return
+                    const idx = Math.floor(Math.random() * waitingPeople.length)
+                    setSelectedParticipantId(waitingPeople[idx].id)
                   }}
                 >
                   Aleatorio
@@ -471,13 +520,13 @@ function App() {
             </div>
             <div className="control-stack compact">
               <p className="eyebrow small">Resumen</p>
-              <div className="pill muted strong">Premios: {remainingPrizes}</div>
-              <div className="pill muted strong">Concursantes: {remainingPeople}</div>
+              <div className="pill muted strong">Premios: {remainingPrizesCount}</div>
+              <div className="pill muted strong">Concursantes: {remainingPeopleCount}</div>
             </div>
           </div>
           <Wheel />
           <div className="cta-row">
-            <button className="cta" onClick={handleSpinRequest} disabled={!token || loadingSpin || spinning || !remainingPrizes}>
+            <button className="cta" onClick={handleSpinRequest} disabled={!token || loadingSpin || spinning || !remainingPrizesCount}>
               {loadingSpin ? 'Registrando giro...' : 'Girar y asignar premio'}
             </button>
             <p className="helper">
@@ -511,16 +560,23 @@ function App() {
           <div className="panel-heading">
             <div>
               <p className="eyebrow small">Concursantes</p>
-              <h2>En espera ({remainingPeople})</h2>
+              <h2>En espera ({remainingPeopleCount})</h2>
             </div>
-          </div>
-          <div className="chips-wrapper">
-            <div className="chips">
-              {raffleState.waitingPeople.map((person) => (
-                <span key={person.id} className="chip">{person.name}</span>
-              ))}
-              {raffleState.waitingPeople.length === 0 && <p className="muted">Todos los asistentes ya recibieron premio.</p>}
             </div>
+            <div className="chips-wrapper">
+              <div className="chips">
+                {participantsToShow.map((person) => (
+                  <span key={person.id} className="chip">{person.name}</span>
+                ))}
+              {waitingPeople.length === 0 && <p className="muted">Todos los asistentes ya recibieron premio.</p>}
+              </div>
+            {waitingPeople.length > COLLAPSE_COUNT && (
+              <div className="see-more-row">
+                <button type="button" className="ghost small" onClick={() => setShowAllParticipants((v) => !v)}>
+                  {showAllParticipants ? 'Ver menos' : 'Ver más'}
+                </button>
+              </div>
+            )}
           </div>
         </section>
 
@@ -528,16 +584,23 @@ function App() {
           <div className="panel-heading">
             <div>
               <p className="eyebrow small">Premios</p>
-              <h2>Disponibles ({remainingPrizes})</h2>
+              <h2>Disponibles ({remainingPrizesCount})</h2>
             </div>
-          </div>
-          <div className="chips-wrapper">
-            <div className="chips prizes">
-              {raffleState.upcomingPrizes.map((prize) => (
-                <span key={prize.id} className="chip prize">{prize.name}</span>
-              ))}
-              {raffleState.upcomingPrizes.length === 0 && <p className="muted">No quedan premios por asignar.</p>}
             </div>
+            <div className="chips-wrapper">
+              <div className="chips prizes">
+                {prizesToShow.map((prize) => (
+                  <span key={prize.id} className="chip prize">{prize.name}</span>
+                ))}
+              {upcomingPrizes.length === 0 && <p className="muted">No quedan premios por asignar.</p>}
+              </div>
+            {upcomingPrizes.length > COLLAPSE_COUNT && (
+              <div className="see-more-row">
+                <button type="button" className="ghost small" onClick={() => setShowAllPrizes((v) => !v)}>
+                  {showAllPrizes ? 'Ver menos' : 'Ver más'}
+                </button>
+              </div>
+            )}
           </div>
         </section>
       </main>
