@@ -20,58 +20,7 @@ func NewSQLServerRepository(db *sql.DB) *SQLServerRepository {
 	return &SQLServerRepository{db: db}
 }
 
-func (r *SQLServerRepository) Snapshot(ctx context.Context) ([]models.Person, []models.Prize, []models.WinnerRecord, error) {
-	people, err := r.availablePeople(ctx)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	prizes, err := r.availablePrizes(ctx)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	winners, err := r.recentWinners(ctx, 5)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	return people, prizes, winners, nil
-}
-
-func (r *SQLServerRepository) Draw(ctx context.Context, prizeID int) (models.WinnerRecord, error) {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return models.WinnerRecord{}, err
-	}
-	defer tx.Rollback()
-
-	person, err := r.pickRandomPerson(ctx, tx)
-	if err != nil {
-		return models.WinnerRecord{}, err
-	}
-	var prize models.Prize
-	if prizeID > 0 {
-		prize, err = r.pickPrizeByID(ctx, tx, prizeID)
-		if err != nil {
-			return models.WinnerRecord{}, err
-		}
-	} else {
-		prize, err = r.pickRandomPrize(ctx, tx)
-	}
-	if err != nil {
-		return models.WinnerRecord{}, err
-	}
-
-	winner, err := r.insertWinner(ctx, tx, person, prize)
-	if err != nil {
-		return models.WinnerRecord{}, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return models.WinnerRecord{}, err
-	}
-	return winner, nil
-}
-
-func (r *SQLServerRepository) availablePeople(ctx context.Context) ([]models.Person, error) {
+func (r *SQLServerRepository) ListParticipants(ctx context.Context) ([]models.Person, error) {
 	query := `SELECT p.id, p.nombre, p.email
 FROM personas p
 WHERE NOT EXISTS (SELECT 1 FROM ganadores g WHERE g.persona_id = p.id)
@@ -93,7 +42,7 @@ ORDER BY p.id`
 	return people, rows.Err()
 }
 
-func (r *SQLServerRepository) availablePrizes(ctx context.Context) ([]models.Prize, error) {
+func (r *SQLServerRepository) ListPrizes(ctx context.Context) ([]models.Prize, error) {
 	query := `SELECT pr.id, pr.nombre, pr.descripcion
 FROM premios pr
 WHERE NOT EXISTS (SELECT 1 FROM ganadores g WHERE g.premio_id = pr.id)
@@ -115,7 +64,11 @@ ORDER BY pr.id`
 	return prizes, rows.Err()
 }
 
-func (r *SQLServerRepository) recentWinners(ctx context.Context, limit int) ([]models.WinnerRecord, error) {
+func (r *SQLServerRepository) ListRecentWinners(ctx context.Context, limit int) ([]models.WinnerRecord, error) {
+	if limit <= 0 {
+		return nil, ErrRecentWinnersInvalid
+	}
+
 	query := `SELECT TOP(@p1) w.id, w.entregado_en, p.id, p.nombre, p.email, r.id, r.nombre, r.descripcion
 FROM ganadores w
 INNER JOIN personas p ON p.id = w.persona_id
@@ -138,32 +91,48 @@ ORDER BY w.entregado_en DESC, w.id DESC`
 	return winners, rows.Err()
 }
 
-func (r *SQLServerRepository) pickRandomPerson(ctx context.Context, tx *sql.Tx) (models.Person, error) {
-	row := tx.QueryRowContext(ctx, `SELECT TOP 1 p.id, p.nombre, p.email
+func (r *SQLServerRepository) SaveAward(ctx context.Context, participantID, prizeID int) (models.WinnerRecord, error) {
+	if participantID == 0 || prizeID == 0 {
+		return models.WinnerRecord{}, ErrNothingToRegister
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return models.WinnerRecord{}, err
+	}
+	defer tx.Rollback()
+
+	person, err := r.pickPersonByID(ctx, tx, participantID)
+	if err != nil {
+		return models.WinnerRecord{}, err
+	}
+
+	prize, err := r.pickPrizeByID(ctx, tx, prizeID)
+	if err != nil {
+		return models.WinnerRecord{}, err
+	}
+
+	winner, err := r.insertWinner(ctx, tx, person, prize)
+	if err != nil {
+		return models.WinnerRecord{}, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return models.WinnerRecord{}, err
+	}
+	return winner, nil
+}
+
+func (r *SQLServerRepository) pickPersonByID(ctx context.Context, tx *sql.Tx, participantID int) (models.Person, error) {
+	row := tx.QueryRowContext(ctx, `SELECT p.id, p.nombre, p.email
 FROM personas p
-WHERE NOT EXISTS (SELECT 1 FROM ganadores g WHERE g.persona_id = p.id)
-ORDER BY NEWID()`)
+WHERE p.id = @p1 AND NOT EXISTS (SELECT 1 FROM ganadores g WHERE g.persona_id = p.id)`, participantID)
 	var p models.Person
 	if err := row.Scan(&p.ID, &p.Name, &p.Email); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return models.Person{}, ErrNoParticipants
+			return models.Person{}, ErrParticipantUsed
 		}
 		return models.Person{}, err
-	}
-	return p, nil
-}
-
-func (r *SQLServerRepository) pickRandomPrize(ctx context.Context, tx *sql.Tx) (models.Prize, error) {
-	row := tx.QueryRowContext(ctx, `SELECT TOP 1 pr.id, pr.nombre, pr.descripcion
-FROM premios pr
-WHERE NOT EXISTS (SELECT 1 FROM ganadores g WHERE g.premio_id = pr.id)
-ORDER BY NEWID()`)
-	var p models.Prize
-	if err := row.Scan(&p.ID, &p.Name, &p.Description); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return models.Prize{}, ErrNoPrizes
-		}
-		return models.Prize{}, err
 	}
 	return p, nil
 }
