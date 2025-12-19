@@ -306,25 +306,6 @@ function App() {
     if (wheelSegments.length > 32) return 'wheel-roomy'
     return ''
   }, [wheelSegments.length])
-  const wheelSlices = useMemo(
-    () =>
-      wheelSegments.map((prize, idx) => {
-        const angle = idx * wheelStep
-        return (
-          <div
-            key={prize.id}
-            className="slice"
-            style={{
-              transform: `translateX(-50%) rotate(${angle}deg)`,
-              backgroundColor: SEGMENT_COLORS[idx % SEGMENT_COLORS.length]
-            }}
-          >
-            <span style={{ transform: `rotate(${-angle}deg)`, fontSize: `${labelSize}px` }}>{prize.name}</span>
-          </div>
-        )
-      }),
-    [labelSize, wheelSegments, wheelStep]
-  )
 
   const remainingPeople = raffleState.waitingPeople?.length || 0
   const remainingPrizes = raffleState.upcomingPrizes?.length || 0
@@ -346,7 +327,23 @@ function App() {
         }}
         onTransitionEnd={() => setSpinning(false)}
       >
-        <div className="wheel-slices">{wheelSlices}</div>
+        <div className="wheel-slices">
+          {wheelSegments.map((prize, idx) => {
+            const angle = idx * wheelStep
+            return (
+              <div
+                key={prize.id}
+                className="slice"
+                style={{
+                  transform: `translateX(-50%) rotate(${angle}deg)`,
+                  backgroundColor: SEGMENT_COLORS[idx % SEGMENT_COLORS.length]
+                }}
+              >
+                <span style={{ transform: `rotate(${-angle}deg)`, fontSize: `${labelSize}px` }}>{prize.name}</span>
+              </div>
+            )
+          })}
+        </div>
         <div className="wheel-center">
           <p className="eyebrow small">Premio</p>
           <strong>{targetPrize?.name || 'Listo para girar'}</strong>
