@@ -19,8 +19,7 @@ const Wheel = React.memo(function Wheel({
         <canvas id={canvasId} className="wheel-canvas" aria-label="Ruleta de premios" />
         <div className="wheel-center">
           <p className="eyebrow small">Premio</p>
-          <strong>{targetPrizeName || 'Listo para girar'}</strong>
-          {participantName ? <p className="helper tiny">Para: {participantName}</p> : null}
+          <strong>{participantName || 'Listo para girar'}</strong>
         </div>
         {!wheelReady && <div className="wheel-overlay">Cargando WinWheel.js</div>}
       </div>

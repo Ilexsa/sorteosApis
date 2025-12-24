@@ -23,7 +23,7 @@ const FALLBACK_PRIZES = [
   { id: -4, name: 'Fundasen', description: '' }
 ]
 
-const SEGMENT_COLORS = ['#f87171', '#fb923c', '#facc15', '#22d3ee', '#34d399', '#60a5fa', '#c084fc', '#f472b6']
+const SEGMENT_COLORS = ['#06fa06e5', '#f80000ff']
 
 const SnowOverlay = () => {
   const flakes = useMemo(
@@ -239,13 +239,13 @@ function App() {
         outerRadius,
         textFontSize,
         textAlignment: 'outer',
-        textMargin: 18,
+        textMargin: 5,
         responsive: false,
         segments: mapped,
         animation: {
           type: 'spinToStop',
           duration: 5.6,
-          spins: 7
+          spins: 10
         }
       })
     },
@@ -563,7 +563,6 @@ function App() {
         <div>
           <p className="eyebrow">🎁 Sorteo en vivo · Fundasen</p>
           <h1>Ruleta de premios en tiempo real</h1>
-          <p className="subtitle">Visualiza participantes en espera, premios disponibles y comparte el giro en todas las pantallas.</p>
           <div className="badges">
             <span className="badge">Concursantes pendientes: {remainingPeopleCount}</span>
             <span className="badge">Premios disponibles: {remainingPrizesCount}</span>
